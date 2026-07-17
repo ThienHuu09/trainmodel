@@ -1,0 +1,402 @@
+/* ==========================================================================
+   1. CẤU HÌNH CHUNG & BIẾN ĐỔI GIAO DIỆN (GLOBAL STYLES)
+   ========================================================================== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #0f172a; /* Nền tối Deep Dark thời thượng */
+    color: #f8fafc;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden; /* Cố định màn hình chính, chỉ cuộn các khu vực con */
+}
+
+.container {
+    width: 100%;
+    max-width: 1800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* ==========================================================================
+   2. THANH TÌM KIẾM Ở TRÊN CÙNG (TOP SEARCH BAR BOX)
+   ========================================================================== */
+.top-search-container {
+    display: flex;
+    justify-content: flex-end; /* Đẩy thanh tìm kiếm về góc phải trên cùng như bản vẽ */
+    margin-bottom: 20px;
+    background-color: #1e293b;
+    padding: 15px 20px;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.search-bar-box {
+    display: flex;
+    width: 500px;
+    gap: 10px;
+}
+
+.search-bar-box input {
+    flex: 1;
+    padding: 10px 15px;
+    border-radius: 6px;
+    border: 2px solid #475569;
+    background-color: #0f172a;
+    color: white;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.search-bar-box input:focus {
+    border-color: #3b82f6; /* Viền sáng xanh khi click chọn */
+}
+
+.search-bar-box button {
+    padding: 0 25px;
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.search-bar-box button:hover {
+    background-color: #2563eb;
+}
+
+/* ==========================================================================
+   3. BỐ CỤC CHÍNH CHIA ĐÔI MÀN HÌNH (MAIN LAYOUT)
+   ========================================================================== */
+.main-layout {
+    display: flex;
+    gap: 20px;
+    flex: 1;
+    overflow: hidden; /* Ngăn layout tổng bị vỡ */
+}
+
+/* KHU VỰC BÊN TRÁI: CHIẾM 3 PHẦN KHÔNG GIAN */
+.left-content {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto; /* Tự động cuộn danh sách ảnh khi quá dài */
+    padding-right: 10px;
+}
+
+/* KHU VỰC BÊN PHẢI (SIDEBAR INSPECTOR): CHIẾM 1 PHẦN KHÔNG GIAN */
+.right-sidebar {
+    flex: 1;
+    min-width: 320px;
+    background-color: #1e293b;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================================================
+   4. CÁC HỘP TÍNH NĂNG & THANH TRẠNG THÁI (TABS & STATUS BAR)
+   ========================================================================== */
+.feature-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background-color: #1e293b;
+    color: #94a3b8;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-btn.active, .tab-btn:hover {
+    background-color: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+.status-bar {
+    background-color: #1e293b;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+    border-left: 4px solid #10b981; /* Vạch xanh lá báo trạng thái */
+    color: #cbd5e1;
+}
+
+.section-title {
+    margin-bottom: 15px;
+    color: #94a3b8;
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* ==========================================================================
+   5. LƯỚI HIỂN THỊ CÁC THẺ ẢNH CAO CẤP (UPGRADED GALLERY & IMAGE CARDS)
+   ========================================================================== */
+.gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* Tỷ lệ vàng cho ảnh 16:9 */
+    gap: 20px;
+    padding-bottom: 20px;
+}
+
+.image-card {
+    background-color: #1e293b;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent; 
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+/* Hiệu ứng tương tác phát sáng viền neon và đẩy card lên nhẹ */
+.image-card:hover, .image-card.selected {
+    transform: translateY(-5px);
+    border-color: #3b82f6;
+    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
+}
+
+.image-card.selected {
+    border-color: #10b981; /* Nếu được click chọn, viền chuyển sang xanh lục bảo cực đẹp */
+    box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4);
+}
+
+/* Khung bọc ảnh tỷ lệ chuẩn 16:9 hỗ trợ hiệu ứng zoom */
+.image-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background-color: #0f172a;
+}
+
+.image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+/* Hiệu ứng phóng to nhẹ ảnh bên trong khi rê chuột */
+.image-card:hover .image-wrapper img {
+    transform: scale(1.08);
+}
+
+/* Mác điểm số (Score Matching) */
+.score-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background-color: rgba(15, 23, 42, 0.85);
+    color: #10b981;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+}
+
+/* Mác thời gian video (Timestamp) kiểu dáng Youtube */
+.timestamp-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 6px;
+    border-radius: 4px;
+    z-index: 10;
+    letter-spacing: 0.5px;
+}
+
+/* Lớp phủ mờ (Overlay) xuất hiện hiệu ứng nút Play */
+.play-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(15, 23, 42, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 5;
+}
+
+.image-card:hover .play-overlay {
+    opacity: 1;
+}
+
+/* Vẽ hình tam giác nút Play bằng CSS */
+.play-overlay::after {
+    content: '';
+    width: 0;
+    height: 0;
+    border-top: 12px solid transparent;
+    border-bottom: 12px solid transparent;
+    border-left: 20px solid rgba(255, 255, 255, 0.9);
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.card-info {
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    text-align: center;
+    color: #cbd5e1;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    background-color: #1e293b;
+    border-top: 1px solid #334155;
+}
+
+/* ==========================================================================
+   6. BỘ KIỂM TRA CHI TIẾT KHUNG HÌNH BÊN PHẢI (KEYFRAME INSPECTOR)
+   ========================================================================== */
+.sidebar-title {
+    font-size: 1.05rem;
+    color: #3b82f6;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 10px;
+    letter-spacing: 0.5px;
+}
+
+.preview-box {
+    width: 100%;
+    height: 180px;
+    background-color: #0f172a;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid #334155;
+}
+
+.preview-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Giữ nguyên tỷ lệ ảnh phóng to không bị méo */
+}
+
+.placeholder-text {
+    color: #64748b;
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 20px;
+    line-height: 1.4;
+}
+
+.video-box video {
+    width: 100%;
+    border-radius: 6px;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+}
+
+/* DANH SÁCH THÔNG SỐ TEXT DỌC (KHÔNG BỌC BOX THEO ĐỀ BÀI) */
+.meta-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-size: 0.88rem;
+    color: #cbd5e1;
+}
+
+.meta-info-list p {
+    border-bottom: 1px dashed #334155;
+    padding-bottom: 8px;
+    word-break: break-all; /* Tránh tràn dòng đối với các path quá dài */
+}
+
+.meta-info-list strong {
+    color: #94a3b8;
+    margin-right: 5px;
+}
+
+/* ==========================================================================
+   7. HỘP ĐƯA API NỘP BÀI CHO BAN TỔ CHỨC (API SUBMIT BOX)
+   ========================================================================== */
+.api-submit-box {
+    margin-top: auto; /* Tự động đẩy cụm nộp bài này bám chắc xuống đáy Sidebar */
+    background-color: #0f172a;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #475569;
+}
+
+.api-submit-box h4 {
+    font-size: 0.8rem;
+    color: #f43f5e; /* Màu đỏ hồng nổi bật cảnh báo */
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.api-submit-box input {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    color: white;
+    font-size: 0.8rem;
+    margin-bottom: 10px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.api-submit-box input:focus {
+    border-color: #f43f5e;
+}
+
+.api-submit-box button {
+    width: 100%;
+    padding: 10px;
+    background-color: #e11d48;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.api-submit-box button:hover {
+    background-color: #be123c;
+}

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MFusion-VR Real-time Station</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="top-search-container">
+            <div class="search-bar-box">
+                <input type="text" id="queryInput" placeholder="Nhập từ khóa truy vấn tại đây (vd: a bird)..." />
+                <button id="searchBtn">🔍 SEARCH</button>
+            </div>
+        </div>
+
+        <div class="main-layout">
+            <div class="left-content">
+                <div class="feature-tabs">
+                    <button class="tab-btn active" data-mode="semantic">Semantic Search</button>
+                    <button class="tab-btn" data-mode="ocr">OCR</button>
+                    <button class="tab-btn" data-mode="asr">ASR</button>
+                    <button class="tab-btn" data-mode="vqa">VQA</button>
+                </div>
+                <div class="status-bar" id="statusBar">Đang khởi động hệ thống...</div>
+                <div class="gallery" id="resultGallery"></div>
+            </div>
+
+            <div class="right-sidebar" id="detailSidebar">
+                <h3 class="sidebar-title">🎥 KEYFRAME INSPECTOR</h3>
+                <div class="preview-box">
+                    <img id="detailImg" src="" alt="Preview" style="display:none;" />
+                    <div id="previewPlaceholder" class="placeholder-text">Bấm vào một Keyframe bên trái để xem</div>
+                </div>
+                <div class="video-box">
+                    <video id="detailVideo" controls><source src="" type="video/mp4"></video>
+                </div>
+                <div class="meta-info-list">
+                    <p><strong>Frame ID:</strong> <span id="metaFrameId">#-----</span></p>
+                    <p><strong>Time:</strong> <span id="metaTime">00:00:00:000</span></p>
+                    <p><strong>Path:</strong> <span id="metaPath">---</span></p>
+                </div>
+                <div class="api-submit-box">
+                    <h4>API SUBMIT (BTC)</h4>
+                    <input type="text" id="apiUrlInput" placeholder="http://server-btc.com/submit..." />
+                    <button id="submitBtcBtn">🚀 NỘP BÀI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const queryInput = document.getElementById('queryInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const resultGallery = document.getElementById('resultGallery');
+        const statusBar = document.getElementById('statusBar');
+        const detailImg = document.getElementById('detailImg');
+        const previewPlaceholder = document.getElementById('previewPlaceholder');
+
+        // Hàm chung dùng để vẽ ảnh lên màn hình (Cho cả Search và Random)
+        function renderGallery(results) {
+            resultGallery.innerHTML = ""; 
+            results.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'image-card';
+                const imgUrl = `http://127.0.0.1:8000/api/image?path=${encodeURIComponent(item.image_path)}`;
+                
+                const fakeSeconds = Math.floor(index * 5.5); 
+                const mm = String(Math.floor(fakeSeconds / 60)).padStart(2, '0');
+                const ss = String(fakeSeconds % 60).padStart(2, '0');
+
+                card.innerHTML = `
+                    <div class="image-wrapper">
+                        <div class="score-badge">🎯 ${item.score}</div>
+                        <img src="${imgUrl}" alt="${item.filename}" loading="lazy">
+                        <div class="timestamp-badge">${mm}:${ss}</div>
+                        <div class="play-overlay"></div>
+                    </div>
+                    <div class="card-info" title="${item.filename}">
+                        ${item.filename.replace(/\.[^/.]+$/, "")}
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    previewPlaceholder.style.display = 'none';
+                    detailImg.src = imgUrl;
+                    detailImg.style.display = 'block';
+
+                    document.getElementById('metaFrameId').textContent = `#${10000 + index}`; 
+                    document.getElementById('metaTime').textContent = `${mm}:${ss}:000 ms`; 
+                    document.getElementById('metaPath').textContent = item.filename;
+                    
+                    document.querySelectorAll('.image-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                });
+                resultGallery.appendChild(card);
+            });
+        }
+
+        // Tự động load 50 ảnh ngẫu nhiên khi vào web
+        async function loadRandomKeyframes() {
+            statusBar.textContent = "🎲 Đang bốc thăm 50 khung hình ngẫu nhiên...";
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/random?limit=50`);
+                const data = await response.json();
+                if (data.results && data.results.length > 0) {
+                    statusBar.textContent = `✅ Đã tải xong ${data.results.length} khung hình mẫu. Hệ thống sẵn sàng!`;
+                    renderGallery(data.results);
+                }
+            } catch (error) {
+                statusBar.textContent = "❌ Lỗi: Không thể kết nối Backend.";
+            }
+        }
+
+        // Hàm tìm kiếm chính
+        async function performSearch() {
+            const prompt = queryInput.value.trim();
+            if (!prompt) return;
+            statusBar.textContent = "⏳ Đang truy vấn dữ liệu (Semantic Search)...";
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/search?prompt=${encodeURIComponent(prompt)}&top_k=50`);
+                const data = await response.json();
+                if (!data.results || data.results.length === 0) {
+                    statusBar.textContent = "❌ Không tìm thấy kết quả nào khớp.";
+                    return;
+                }
+                statusBar.textContent = `✅ Tìm thấy ${data.results.length} ảnh tương ứng.`;
+                renderGallery(data.results);
+            } catch (error) {
+                statusBar.textContent = "❌ Lỗi kết nối API Server.";
+            }
+        }
+
+        searchBtn.addEventListener('click', performSearch);
+        queryInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
+        window.addEventListener('DOMContentLoaded', loadRandomKeyframes);
+
+        document.querySelectorAll('.tab-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                button.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
