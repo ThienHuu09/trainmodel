@@ -57,6 +57,90 @@
         const statusBar = document.getElementById('statusBar');
         const detailImg = document.getElementById('detailImg');
         const previewPlaceholder = document.getElementById('previewPlaceholder');
+        const detailVideo = document.getElementById('detailVideo');
+        const detailVideoSource = detailVideo.querySelector('source');
+
+        // pts_time từ backend là MILISECONDS (ms). Hàm này CHỈ dùng để
+        // HIỂN THỊ đẹp trên giao diện (tách ra giờ:phút:giây:mili giây),
+        // không đổi đơn vị - vẫn tính toán dựa trên giá trị ms gốc.
+        function formatMsToTimecode(ms) {
+            ms = Math.max(0, Math.floor(ms || 0));
+            const totalSeconds = Math.floor(ms / 1000);
+            const hh = Math.floor(totalSeconds / 3600);
+            const mm = Math.floor((totalSeconds % 3600) / 60);
+            const ss = totalSeconds % 60;
+            const mmm = ms % 1000;
+            const pad = (n, len = 2) => String(n).padStart(len, '0');
+            return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(mmm, 3)}`;
+        }
+
+        // Bản rút gọn MM:SS cho cái badge nhỏ trên mỗi thẻ ảnh (cũng chỉ để hiển thị)
+        function formatMsToShort(ms) {
+            ms = Math.max(0, Math.floor(ms || 0));
+            const totalSeconds = Math.floor(ms / 1000);
+            const mm = Math.floor(totalSeconds / 60);
+            const ss = totalSeconds % 60;
+            return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+        }
+
+        // Lấy tên file từ image_path (vd "L21_V001/125.webp" -> "125.webp")
+        // - backend không trả field "filename" riêng, phải tự tách ra.
+        function getFilename(imagePath) {
+            if (!imagePath) return "unknown";
+            return imagePath.split('/').pop();
+        }
+
+        // Tua video tới đúng thời điểm keyframe xuất hiện. QUAN TRỌNG:
+        // video.currentTime của HTML tính bằng GIÂY, nên chỉ ở ĐÚNG DÒNG
+        // NÀY mới chia pts_time (ms) cho 1000 - mọi nơi khác vẫn giữ ms.
+        // Vì pts_time đã là GIÂY, hàm format hiển thị sẽ nhân với 1000 để tách lấy mili-giây hiển thị chơi cho đẹp
+function formatSecondsToTimecode(seconds) {
+    seconds = Math.max(0, Number(seconds) || 0);
+    const hh = Math.floor(seconds / 3600);
+    const mm = Math.floor((seconds % 3600) / 60);
+    const ss = Math.floor(seconds % 60);
+    const mmm = Math.floor((seconds % 1) * 1000);
+
+    const pad = (n, len = 2) => String(n).padStart(len, '0');
+    return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(mmm, 3)}`;
+}
+
+function formatSecondsToShort(seconds) {
+    seconds = Math.max(0, Number(seconds) || 0);
+    const mm = Math.floor(seconds / 60);
+    const ss = Math.floor(seconds % 60);
+    return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
+
+// HÀM TUA VIDEO CHUẨN XÁC (Không chia 1000 nữa vì pts_time đã là giây)
+// HÀM TUA VIDEO VÀ BẬT ÂM THANH CHUẨN XÁC
+function seekVideoToKeyframe(item) {
+    if (!item.video_name) return;
+    const videoUrl = `http://127.0.0.1:8000/api/video?video_name=${encodeURIComponent(item.video_name)}`;
+    
+    const targetSeconds = Number(item.pts_time) || 0;
+
+    const doSeek = () => {
+        try {
+            detailVideo.currentTime = targetSeconds; // Nhảy thẳng đến giây đó
+            detailVideo.muted = false; // BẮT BUỘC BẬT TIẾNG (Đảm bảo không bị mute ngầm)
+            detailVideo.play().catch((err) => {
+                console.log("Trình duyệt chặn autoplay có âm thanh:", err);
+            });
+        } catch (e) {
+            console.log("Lỗi tua video:", e);
+        }
+    };
+
+    const currentSrc = detailVideoSource.getAttribute('src') || "";
+    if (currentSrc.includes(encodeURIComponent(item.video_name))) {
+        doSeek();
+    } else {
+        detailVideoSource.src = videoUrl;
+        detailVideo.load();
+        detailVideo.onloadedmetadata = doSeek;
+    }
+}
 
         // Hàm chung dùng để vẽ ảnh lên màn hình (Cho cả Search và Random)
         function renderGallery(results) {
@@ -65,20 +149,18 @@
                 const card = document.createElement('div');
                 card.className = 'image-card';
                 const imgUrl = `http://127.0.0.1:8000/api/image?path=${encodeURIComponent(item.image_path)}`;
-                
-                const fakeSeconds = Math.floor(index * 5.5); 
-                const mm = String(Math.floor(fakeSeconds / 60)).padStart(2, '0');
-                const ss = String(fakeSeconds % 60).padStart(2, '0');
+                const filename = getFilename(item.image_path);
+                const shortTime = formatMsToShort(item.pts_time);
 
                 card.innerHTML = `
                     <div class="image-wrapper">
                         <div class="score-badge">🎯 ${item.score}</div>
-                        <img src="${imgUrl}" alt="${item.filename}" loading="lazy">
-                        <div class="timestamp-badge">${mm}:${ss}</div>
+                        <img src="${imgUrl}" alt="${filename}" loading="lazy">
+                        <div class="timestamp-badge">${shortTime}</div>
                         <div class="play-overlay"></div>
                     </div>
-                    <div class="card-info" title="${item.filename}">
-                        ${item.filename.replace(/\.[^/.]+$/, "")}
+                    <div class="card-info" title="${filename}">
+                        ${filename.replace(/\.[^/.]+$/, "")}
                     </div>
                 `;
 
@@ -87,10 +169,12 @@
                     detailImg.src = imgUrl;
                     detailImg.style.display = 'block';
 
-                    document.getElementById('metaFrameId').textContent = `#${10000 + index}`; 
-                    document.getElementById('metaTime').textContent = `${mm}:${ss}:000 ms`; 
-                    document.getElementById('metaPath').textContent = item.filename;
-                    
+                    document.getElementById('metaFrameId').textContent = `#${item.frame_id ?? '-----'}`;
+                    document.getElementById('metaTime').textContent = formatMsToTimecode(item.pts_time); // hiển thị vẫn dựa trên ms
+                    document.getElementById('metaPath').textContent = item.image_path || filename;
+
+                    seekVideoToKeyframe(item); // tua video - hàm này tự đổi ms->s bên trong
+
                     document.querySelectorAll('.image-card').forEach(c => c.classList.remove('selected'));
                     card.classList.add('selected');
                 });
