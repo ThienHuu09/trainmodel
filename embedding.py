@@ -5,21 +5,21 @@ from qdrant_client.http import models
 # 1. Kết nối tới Qdrant Server (đảm bảo qdrant.exe đang chạy)
 client = QdrantClient(host="127.0.0.1", port=6333)
 
-COLLECTION_NAME = "mfusion_vr"  # Đổi tên collection theo ý bạn
+# Đặt tên collection theo mẫu bạn yêu cầu
+COLLECTION_NAME = "dfn5b_images"
 
-# 2. Tạo collection nếu chưa tồn tại (giả sử vector chiều dài 512, tuỳ mô hình embedding của bạn)
+# 2. Tạo collection nếu chưa tồn tại 
 if not client.collection_exists(collection_name=COLLECTION_NAME):
     client.create_collection(
         collection_name=COLLECTION_NAME,
         vectors_config=models.VectorParams(
-            size=512,  # Số chiều của vector (ví dụ: CLIP vit-b-32 dùng 512, v.v.)
+            size=512,  # Số chiều vector (nếu model dfn5b của bạn dùng kích thước khác ví dụ 768 hay 1024 thì sửa lại số này cho đúng)
             distance=models.Distance.COSINE
         )
     )
     print(f"Đã tạo collection mới: {COLLECTION_NAME}")
 
-# 3. Đọc dữ liệu từ file JSON (ví dụ: embeddings.json)
-# Cấu trúc file JSON mong đợi: list các object, mỗi object có 'id', 'vector', và 'payload'
+# 3. Đọc dữ liệu từ file JSON embeddings.json
 json_file_path = "embeddings.json" 
 
 with open(json_file_path, "r", encoding="utf-8") as f:
@@ -27,10 +27,9 @@ with open(json_file_path, "r", encoding="utf-8") as f:
 
 points = []
 for idx, item in enumerate(data):
-    # item bao gồm: vector, video_name, pts_time, image_path, frame_id,...
     points.append(
         models.PointStruct(
-            id=item.get("id", idx),  # ID định danh cho điểm (số nguyên hoặc UUID)
+            id=item.get("id", idx),  # ID định danh cho điểm
             vector=item["vector"],    # Mảng vector embedding
             payload={
                 "video_name": item.get("video_name"),
@@ -49,6 +48,6 @@ for i in range(0, len(points), batch_size):
         collection_name=COLLECTION_NAME,
         points=batch
     )
-    print(f"Đã lưu batch từ {i} đến {i + len(batch)} vào Qdrant...")
+    print(f"Đã lưu batch từ {i} đến {i + len(batch)} vào Qdrant (collection: {COLLECTION_NAME})...")
 
 print("Hoàn tất đẩy dữ liệu JSON vào Qdrant Server thành công!")
