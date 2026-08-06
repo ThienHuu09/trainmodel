@@ -1,75 +1,54 @@
-import os
-import torch
-import open_clip
-from PIL import Image
-import uuid
+import json
 from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance, PointStruct
-from tqdm import tqdm
+from qdrant_client.http import models
 
-device = "cpu"
-print("🖥️ Khởi tạo hệ thống nhúng Vector (QDRANT ENGINE - CPU)")
+# 1. Kết nối tới Qdrant Server (đảm bảo qdrant.exe đang chạy)
+client = QdrantClient(host="127.0.0.1", port=6333)
 
-DATASET_DIR = r"C:\AIC2026\dataset"
-COLLECTION_NAME = "dfn5b_images"
-VECTOR_SIZE = 1024 # Vector đầu ra của mô hình ViT-H-14 DFN5B
+COLLECTION_NAME = "mfusion_vr"  # Đổi tên collection theo ý bạn
 
-# 1. Tải mô hình
-model, _, preprocess = open_clip.create_model_and_transforms('ViT-H-14', pretrained='dfn5b', device=device)
-model.eval()
-
-# 2. Kết nối tới Qdrant Local (.exe đang chạy cổng 6333)
-qdrant = QdrantClient(host="localhost", port=6333)
-
-# Kiểm tra và tạo Collection nếu chưa có
-if not qdrant.collection_exists(COLLECTION_NAME):
-    qdrant.create_collection(
+# 2. Tạo collection nếu chưa tồn tại (giả sử vector chiều dài 512, tuỳ mô hình embedding của bạn)
+if not client.collection_exists(collection_name=COLLECTION_NAME):
+    client.create_collection(
         collection_name=COLLECTION_NAME,
-        vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+        vectors_config=models.VectorParams(
+            size=512,  # Số chiều của vector (ví dụ: CLIP vit-b-32 dùng 512, v.v.)
+            distance=models.Distance.COSINE
+        )
     )
-    print(f"✅ Đã tạo mới Collection: {COLLECTION_NAME}")
+    print(f"Đã tạo collection mới: {COLLECTION_NAME}")
 
-print(f"⏳ Đang quét danh sách file ảnh trong {DATASET_DIR}...")
-valid_extensions = ('.jpg', '.jpeg', '.png', '.webp')
-image_paths = [os.path.join(root, file) for root, _, files in os.walk(DATASET_DIR) for file in files if file.lower().endswith(valid_extensions)]
-print(f"📊 Tổng số lượng ảnh tìm thấy: {len(image_paths)}")
+# 3. Đọc dữ liệu từ file JSON (ví dụ: embeddings.json)
+# Cấu trúc file JSON mong đợi: list các object, mỗi object có 'id', 'vector', và 'payload'
+json_file_path = "embeddings.json" 
 
-# 3. Tiến hành trích xuất dữ liệu theo Batch
-BATCH_SIZE = 32 
-for i in tqdm(range(0, len(image_paths), BATCH_SIZE), desc="Đẩy dữ liệu lên Qdrant"):
-    batch_paths = image_paths[i:i+BATCH_SIZE]
-    batch_images = []
-    valid_paths = []
-    
-    for path in batch_paths:
-        try:
-            img = Image.open(path).convert('RGB')
-            batch_images.append(preprocess(img))
-            valid_paths.append(path)
-        except Exception:
-            continue
-            
-    if not batch_images:
-        continue
-        
-    image_tensors = torch.stack(batch_images).to(device)
-    with torch.no_grad():
-        image_features = model.encode_image(image_tensors)
-        image_features /= image_features.norm(dim=-1, keepdim=True)
-        embeddings = image_features.numpy().tolist()
-        
-    points = []
-    for path, vector in zip(valid_paths, embeddings):
-        # Tạo ID UUID cố định dựa trên đường dẫn ảnh
-        point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, path))
-        clean_path = path.replace("\\", "/") # Chuẩn hóa cho web
-        
-        points.append(PointStruct(
-            id=point_id,
-            vector=vector,
-            payload={"image_path": clean_path, "filename": os.path.basename(path)}
-        ))
-        
-    qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
+with open(json_file_path, "r", encoding="utf-8") as f:
+    data = json.load(f)
 
-print("🎉 XONG! Dữ liệu ảnh đã được lưu trong Qdrant Local. Bạn có thể check tại: http://localhost:6333/dashboard")
+points = []
+for idx, item in enumerate(data):
+    # item bao gồm: vector, video_name, pts_time, image_path, frame_id,...
+    points.append(
+        models.PointStruct(
+            id=item.get("id", idx),  # ID định danh cho điểm (số nguyên hoặc UUID)
+            vector=item["vector"],    # Mảng vector embedding
+            payload={
+                "video_name": item.get("video_name"),
+                "pts_time": item.get("pts_time"),
+                "image_path": item.get("image_path"),
+                "frame_id": item.get("frame_id")
+            }
+        )
+    )
+
+# 4. Upload (Upsert) dữ liệu lên Qdrant theo từng batch để tối ưu tốc độ
+batch_size = 100
+for i in range(0, len(points), batch_size):
+    batch = points[i:i + batch_size]
+    client.upsert(
+        collection_name=COLLECTION_NAME,
+        points=batch
+    )
+    print(f"Đã lưu batch từ {i} đến {i + len(batch)} vào Qdrant...")
+
+print("Hoàn tất đẩy dữ liệu JSON vào Qdrant Server thành công!")
