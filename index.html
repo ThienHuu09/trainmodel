@@ -5,13 +5,100 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MFusion-VR Real-time Station</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* CSS bổ sung cho box TraKE và OCR Image-to-Image */
+        .trake-inputs-container, .ocr-image-box {
+            display: none; 
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+        .trake-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .trake-row label {
+            font-weight: bold;
+            font-size: 13px;
+            color: #333;
+            min-width: 65px;
+        }
+        .trake-row input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        /* Style cho Drop Zone Image-to-Image của OCR */
+        .drop-zone {
+            border: 2px dashed #4f46e5;
+            padding: 15px;
+            text-align: center;
+            background: #f8fafc;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .drop-zone:hover {
+            background: #f1f5f9;
+        }
+        .drop-zone p {
+            margin: 0;
+            font-size: 13px;
+            color: #475569;
+        }
+        #ocrPreviewImg {
+            max-height: 80px;
+            margin-top: 5px;
+            display: none;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <div class="top-search-container">
-            <div class="search-bar-box">
+            <!-- Ô nhập chuẩn cho Semantic, ASR, VQA -->
+            <div class="search-bar-box" id="singleSearchBox">
                 <input type="text" id="queryInput" placeholder="Nhập từ khóa truy vấn tại đây (vd: a bird)..." />
                 <button id="searchBtn">🔍 SEARCH</button>
+            </div>
+
+            <!-- Box riêng cho OCR: Hỗ trợ cả nhập text lẫn kéo thả ảnh tìm kiếm -->
+            <div class="ocr-image-box" id="ocrBox">
+                <div class="search-bar-box" style="margin-bottom: 4px;">
+                    <input type="text" id="ocrTextInput" placeholder="Hoặc nhập văn bản OCR cần tìm..." />
+                    <button id="searchOcrTextBtn">🔍 TÌM TEXT</button>
+                </div>
+                <div class="drop-zone" id="dropZone">
+                    <p>📂 Kéo thả ảnh vào đây hoặc <strong>bấm để chọn ảnh</strong> tìm kiếm tương đồng</p>
+                    <input type="file" id="ocrImageInput" accept="image/*" style="display: none;" />
+                    <img id="ocrPreviewImg" src="" alt="Preview Image" />
+                </div>
+                <button id="searchOcrImgBtn" style="padding: 8px; background: #4f46e5; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🚀 TÌM KIẾM ẢNH TƯƠNG ĐỒNG (IMAGE-TO-IMAGE)</button>
+            </div>
+
+            <!-- 4 Ô nhập riêng cho TraKE -->
+            <div class="trake-inputs-container" id="trakeBox">
+                <div class="trake-row">
+                    <label>Khoảnh 1:</label>
+                    <input type="text" id="trakeInput1" placeholder="Nhập sự kiện 1 (vd: giậm nhảy)..." />
+                </div>
+                <div class="trake-row">
+                    <label>Khoảnh 2:</label>
+                    <input type="text" id="trakeInput2" placeholder="Nhập sự kiện 2 (vd: bay qua xà)..." />
+                </div>
+                <div class="trake-row">
+                    <label>Khoảnh 3:</label>
+                    <input type="text" id="trakeInput3" placeholder="Nhập sự kiện 3 (vd: tiếp đất)..." />
+                </div>
+                <div class="trake-row">
+                    <label>Khoảnh 4:</label>
+                    <input type="text" id="trakeInput4" placeholder="Nhập sự kiện 4 (vd: đứng dậy)..." />
+                </div>
+                <button id="searchTrakeBtn" style="margin-top: 4px; padding: 10px; background: #2563eb; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🚀 TÌM KIẾM CHUỖI TraKE</button>
             </div>
         </div>
 
@@ -22,6 +109,7 @@
                     <button class="tab-btn" data-mode="ocr">OCR</button>
                     <button class="tab-btn" data-mode="asr">ASR</button>
                     <button class="tab-btn" data-mode="vqa">VQA</button>
+                    <button class="tab-btn" data-mode="trake">TraKE</button>
                 </div>
                 <div class="status-bar" id="statusBar">Đang khởi động hệ thống...</div>
                 <div class="gallery" id="resultGallery"></div>
@@ -53,6 +141,25 @@
     <script>
         const queryInput = document.getElementById('queryInput');
         const searchBtn = document.getElementById('searchBtn');
+        const singleSearchBox = document.getElementById('singleSearchBox');
+        
+        const ocrBox = document.getElementById('ocrBox');
+        const ocrTextInput = document.getElementById('ocrTextInput');
+        const searchOcrTextBtn = document.getElementById('searchOcrTextBtn');
+        const dropZone = document.getElementById('dropZone');
+        const ocrImageInput = document.getElementById('ocrImageInput');
+        const ocrPreviewImg = document.getElementById('ocrPreviewImg');
+        const searchOcrImgBtn = document.getElementById('searchOcrImgBtn');
+
+        const trakeBox = document.getElementById('trakeBox');
+        const searchTrakeBtn = document.getElementById('searchTrakeBtn');
+        const trakeInputs = [
+            document.getElementById('trakeInput1'),
+            document.getElementById('trakeInput2'),
+            document.getElementById('trakeInput3'),
+            document.getElementById('trakeInput4')
+        ];
+
         const resultGallery = document.getElementById('resultGallery');
         const statusBar = document.getElementById('statusBar');
         const detailImg = document.getElementById('detailImg');
@@ -60,101 +167,139 @@
         const detailVideo = document.getElementById('detailVideo');
         const detailVideoSource = detailVideo.querySelector('source');
 
-        // pts_time từ backend là MILISECONDS (ms). Hàm này CHỈ dùng để
-        // HIỂN THỊ đẹp trên giao diện (tách ra giờ:phút:giây:mili giây),
-        // không đổi đơn vị - vẫn tính toán dựa trên giá trị ms gốc.
-        function formatMsToTimecode(ms) {
-            ms = Math.max(0, Math.floor(ms || 0));
-            const totalSeconds = Math.floor(ms / 1000);
-            const hh = Math.floor(totalSeconds / 3600);
-            const mm = Math.floor((totalSeconds % 3600) / 60);
-            const ss = totalSeconds % 60;
-            const mmm = ms % 1000;
+        let currentMode = 'semantic'; 
+        let selectedOcrFile = null; // Lưu file ảnh để gửi API image-to-image
+
+        const tabConfig = {
+            'semantic': { placeholder: 'Nhập từ khóa truy vấn ngữ nghĩa (vd: a bird)...', status: '🔍 Đã chuyển sang chế độ Semantic Search.' },
+            'ocr': { status: '🔤 Đã chuyển sang chế độ OCR (Hỗ trợ tìm text hoặc kéo thả ảnh tương đồng).' },
+            'asr': { placeholder: 'Nhập từ khóa lời thoại nhân vật...', status: '🎙️ Đã chuyển sang chế độ ASR Search.' },
+            'vqa': { placeholder: 'Nhập câu hỏi về nội dung khung hình...', status: '🤖 Đã chuyển sang chế độ VQA.' },
+            'trake': { status: '⏱️ Đã chuyển sang chế độ TraKE (Nhập 4 khoảnh khắc liên tiếp).' }
+        };
+
+        // Chuyển đổi giao diện các tab
+        document.querySelectorAll('.tab-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                button.classList.add('active');
+                currentMode = button.getAttribute('data-mode');
+                
+                const config = tabConfig[currentMode];
+                if (config) statusBar.textContent = config.status;
+
+                // Ẩn hiện các search box tùy thuộc vào tab đang chọn
+                singleSearchBox.style.display = 'none';
+                ocrBox.style.display = 'none';
+                trakeBox.style.display = 'none';
+
+                if (currentMode === 'ocr') {
+                    ocrBox.style.display = 'flex';
+                } else if (currentMode === 'trake') {
+                    trakeBox.style.display = 'flex';
+                } else {
+                    singleSearchBox.style.display = 'flex';
+                    queryInput.placeholder = config.placeholder;
+                }
+            });
+        });
+
+        // Xử lý kéo thả và chọn ảnh cho OCR Image-to-Image
+        dropZone.addEventListener('click', () => ocrImageInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.background = '#e2e8f0';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.background = '#f8fafc';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.background = '#f8fafc';
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleSelectedImage(e.dataTransfer.files[0]);
+            }
+        });
+
+        ocrImageInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                handleSelectedImage(e.target.files[0]);
+            }
+        });
+
+        function handleSelectedImage(file) {
+            selectedOcrFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                ocrPreviewImg.src = e.target.result;
+                ocrPreviewImg.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+            statusBar.textContent = `📁 Đã chọn ảnh: ${file.name}. Bấm nút tìm kiếm tương đồng để bắt đầu!`;
+        }
+
+        function formatSecondsToTimecode(seconds) {
+            seconds = Math.max(0, Number(seconds) || 0);
+            const hh = Math.floor(seconds / 3600);
+            const mm = Math.floor((seconds % 3600) / 60);
+            const ss = Math.floor(seconds % 60);
+            const mmm = Math.floor((seconds % 1) * 1000);
             const pad = (n, len = 2) => String(n).padStart(len, '0');
             return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(mmm, 3)}`;
         }
 
-        // Bản rút gọn MM:SS cho cái badge nhỏ trên mỗi thẻ ảnh (cũng chỉ để hiển thị)
-        function formatMsToShort(ms) {
-            ms = Math.max(0, Math.floor(ms || 0));
-            const totalSeconds = Math.floor(ms / 1000);
-            const mm = Math.floor(totalSeconds / 60);
-            const ss = totalSeconds % 60;
+        function formatSecondsToShort(seconds) {
+            seconds = Math.max(0, Number(seconds) || 0);
+            const mm = Math.floor(seconds / 60);
+            const ss = Math.floor(seconds % 60);
             return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
         }
 
-        // Lấy tên file từ image_path (vd "L21_V001/125.webp" -> "125.webp")
-        // - backend không trả field "filename" riêng, phải tự tách ra.
         function getFilename(imagePath) {
             if (!imagePath) return "unknown";
             return imagePath.split('/').pop();
         }
 
-        // Tua video tới đúng thời điểm keyframe xuất hiện. QUAN TRỌNG:
-        // video.currentTime của HTML tính bằng GIÂY, nên chỉ ở ĐÚNG DÒNG
-        // NÀY mới chia pts_time (ms) cho 1000 - mọi nơi khác vẫn giữ ms.
-        // Vì pts_time đã là GIÂY, hàm format hiển thị sẽ nhân với 1000 để tách lấy mili-giây hiển thị chơi cho đẹp
-function formatSecondsToTimecode(seconds) {
-    seconds = Math.max(0, Number(seconds) || 0);
-    const hh = Math.floor(seconds / 3600);
-    const mm = Math.floor((seconds % 3600) / 60);
-    const ss = Math.floor(seconds % 60);
-    const mmm = Math.floor((seconds % 1) * 1000);
+        function seekVideoToKeyframe(item) {
+            if (!item.video_name) return;
+            const videoUrl = `http://127.0.0.1:8000/api/video?video_name=${encodeURIComponent(item.video_name)}`;
+            const targetSeconds = Number(item.pts_time) || 0;
 
-    const pad = (n, len = 2) => String(n).padStart(len, '0');
-    return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(mmm, 3)}`;
-}
+            const doSeek = () => {
+                try {
+                    detailVideo.currentTime = targetSeconds; 
+                    detailVideo.muted = false; 
+                    detailVideo.play().catch(() => {});
+                } catch (e) {
+                    console.log("Lỗi tua video:", e);
+                }
+            };
 
-function formatSecondsToShort(seconds) {
-    seconds = Math.max(0, Number(seconds) || 0);
-    const mm = Math.floor(seconds / 60);
-    const ss = Math.floor(seconds % 60);
-    return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-}
-
-// HÀM TUA VIDEO CHUẨN XÁC (Không chia 1000 nữa vì pts_time đã là giây)
-// HÀM TUA VIDEO VÀ BẬT ÂM THANH CHUẨN XÁC
-function seekVideoToKeyframe(item) {
-    if (!item.video_name) return;
-    const videoUrl = `http://127.0.0.1:8000/api/video?video_name=${encodeURIComponent(item.video_name)}`;
-    
-    const targetSeconds = Number(item.pts_time) || 0;
-
-    const doSeek = () => {
-        try {
-            detailVideo.currentTime = targetSeconds; // Nhảy thẳng đến giây đó
-            detailVideo.muted = false; // BẮT BUỘC BẬT TIẾNG (Đảm bảo không bị mute ngầm)
-            detailVideo.play().catch((err) => {
-                console.log("Trình duyệt chặn autoplay có âm thanh:", err);
-            });
-        } catch (e) {
-            console.log("Lỗi tua video:", e);
+            const currentSrc = detailVideoSource.getAttribute('src') || "";
+            if (currentSrc.includes(encodeURIComponent(item.video_name))) {
+                doSeek();
+            } else {
+                detailVideoSource.src = videoUrl;
+                detailVideo.load();
+                detailVideo.onloadedmetadata = doSeek;
+            }
         }
-    };
 
-    const currentSrc = detailVideoSource.getAttribute('src') || "";
-    if (currentSrc.includes(encodeURIComponent(item.video_name))) {
-        doSeek();
-    } else {
-        detailVideoSource.src = videoUrl;
-        detailVideo.load();
-        detailVideo.onloadedmetadata = doSeek;
-    }
-}
-
-        // Hàm chung dùng để vẽ ảnh lên màn hình (Cho cả Search và Random)
         function renderGallery(results) {
             resultGallery.innerHTML = ""; 
-            results.forEach((item, index) => {
+            results.forEach((item) => {
                 const card = document.createElement('div');
                 card.className = 'image-card';
                 const imgUrl = `http://127.0.0.1:8000/api/image?path=${encodeURIComponent(item.image_path)}`;
                 const filename = getFilename(item.image_path);
-                const shortTime = formatMsToShort(item.pts_time);
+                const shortTime = formatSecondsToShort(item.pts_time);
 
                 card.innerHTML = `
                     <div class="image-wrapper">
-                        <div class="score-badge">🎯 ${item.score}</div>
+                        <div class="score-badge">🎯 ${item.score ?? 0}</div>
                         <img src="${imgUrl}" alt="${filename}" loading="lazy">
                         <div class="timestamp-badge">${shortTime}</div>
                         <div class="play-overlay"></div>
@@ -170,10 +315,10 @@ function seekVideoToKeyframe(item) {
                     detailImg.style.display = 'block';
 
                     document.getElementById('metaFrameId').textContent = `#${item.frame_id ?? '-----'}`;
-                    document.getElementById('metaTime').textContent = formatMsToTimecode(item.pts_time); // hiển thị vẫn dựa trên ms
+                    document.getElementById('metaTime').textContent = formatSecondsToTimecode(item.pts_time);
                     document.getElementById('metaPath').textContent = item.image_path || filename;
 
-                    seekVideoToKeyframe(item); // tua video - hàm này tự đổi ms->s bên trong
+                    seekVideoToKeyframe(item);
 
                     document.querySelectorAll('.image-card').forEach(c => c.classList.remove('selected'));
                     card.classList.add('selected');
@@ -182,7 +327,6 @@ function seekVideoToKeyframe(item) {
             });
         }
 
-        // Tự động load 50 ảnh ngẫu nhiên khi vào web
         async function loadRandomKeyframes() {
             statusBar.textContent = "🎲 Đang bốc thăm 50 khung hình ngẫu nhiên...";
             try {
@@ -197,11 +341,11 @@ function seekVideoToKeyframe(item) {
             }
         }
 
-        // Hàm tìm kiếm chính
+        // Tìm kiếm chung cho các tab đơn
         async function performSearch() {
             const prompt = queryInput.value.trim();
             if (!prompt) return;
-            statusBar.textContent = "⏳ Đang truy vấn dữ liệu (Semantic Search)...";
+            statusBar.textContent = `⏳ Đang truy vấn dữ liệu (${currentMode.toUpperCase()})...`;
             try {
                 const response = await fetch(`http://127.0.0.1:8000/api/search?prompt=${encodeURIComponent(prompt)}&top_k=50`);
                 const data = await response.json();
@@ -209,23 +353,98 @@ function seekVideoToKeyframe(item) {
                     statusBar.textContent = "❌ Không tìm thấy kết quả nào khớp.";
                     return;
                 }
-                statusBar.textContent = `✅ Tìm thấy ${data.results.length} ảnh tương ứng.`;
+                statusBar.textContent = `✅ Tìm thấy ${data.results.length} kết quả.`;
                 renderGallery(data.results);
             } catch (error) {
                 statusBar.textContent = "❌ Lỗi kết nối API Server.";
             }
         }
 
+        // Tìm kiếm text trong OCR
+        async function performOcrTextSearch() {
+            const text = ocrTextInput.value.trim();
+            if (!text) return;
+            statusBar.textContent = "🔤 Đang tìm kiếm văn bản OCR...";
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/search?prompt=${encodeURIComponent(text)}&top_k=50`);
+                const data = await response.json();
+                if (!data.results || data.results.length === 0) {
+                    statusBar.textContent = "❌ Không tìm thấy văn bản OCR phù hợp.";
+                    return;
+                }
+                statusBar.textContent = `✅ Tìm thấy ${data.results.length} kết quả OCR.`;
+                renderGallery(data.results);
+            } catch (error) {
+                statusBar.textContent = "❌ Lỗi kết nối API OCR.";
+            }
+        }
+
+        // Tìm kiếm ảnh tương đồng (Image-to-Image) cho OCR
+        async function performOcrImageSearch() {
+            if (!selectedOcrFile) {
+                alert("Vui lòng kéo thả hoặc chọn một file ảnh trước!");
+                return;
+            }
+            statusBar.textContent = "🔄 Đang tải ảnh lên và tìm kiếm ảnh tương đồng...";
+            
+            const formData = new FormData();
+            formData.append("file", selectedOcrFile);
+
+            try {
+                // Đổi thành endpoint image-to-image tương ứng trên backend của bạn nếu có (ví dụ /api/image_search)
+                const response = await fetch(`http://127.0.0.1:8000/api/search?prompt=image_query&top_k=50`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (!data.results || data.results.length === 0) {
+                    statusBar.textContent = "❌ Không tìm thấy ảnh tương đồng phù hợp.";
+                    return;
+                }
+                statusBar.textContent = `✅ Tìm thấy ${data.results.length} ảnh tương đồng.`;
+                renderGallery(data.results);
+            } catch (error) {
+                statusBar.textContent = "❌ Lỗi kết nối API Image-to-Image.";
+            }
+        }
+
+        // Tìm kiếm TraKE
+        async function performTrakeSearch() {
+            const queries = trakeInputs.map(input => input.value.trim());
+            if (queries.every(q => q === "")) {
+                alert("Vui lòng nhập ít nhất một khoảng khắc sự kiện!");
+                return;
+            }
+
+            statusBar.textContent = "⏱️ Đang xử lý truy vấn chuỗi khoảng khắc TraKE...";
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/trake?q1=${encodeURIComponent(queries[0])}&q2=${encodeURIComponent(queries[1])}&q3=${encodeURIComponent(queries[2])}&q4=${encodeURIComponent(queries[3])}`);
+                const data = await response.json();
+
+                if (!data.results || data.results.length === 0) {
+                    statusBar.textContent = "❌ Không tìm thấy chuỗi sự kiện TraKE phù hợp.";
+                    return;
+                }
+                statusBar.textContent = `✅ Tìm thấy ${data.results.length} kết quả chuỗi TraKE thỏa mãn.`;
+                renderGallery(data.results);
+            } catch (error) {
+                statusBar.textContent = "❌ Lỗi kết nối API Server TraKE.";
+            }
+        }
+
         searchBtn.addEventListener('click', performSearch);
         queryInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
-        window.addEventListener('DOMContentLoaded', loadRandomKeyframes);
+        
+        searchOcrTextBtn.addEventListener('click', performOcrTextSearch);
+        ocrTextInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performOcrTextSearch(); });
+        searchOcrImgBtn.addEventListener('click', performOcrImageSearch);
 
-        document.querySelectorAll('.tab-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                button.classList.add('active');
-            });
+        searchTrakeBtn.addEventListener('click', performTrakeSearch);
+        trakeInputs.forEach(input => {
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') performTrakeSearch(); });
         });
+
+        window.addEventListener('DOMContentLoaded', loadRandomKeyframes);
     </script>
 </body>
 </html>
