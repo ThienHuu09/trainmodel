@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MFusion-VR Real-time Station</title>
+    <title>N0N-L1NERS</title>
     <link rel="stylesheet" href="style.css">
     <style>
         /* CSS bổ sung cho box TraKE và OCR Image-to-Image */
@@ -21,13 +21,15 @@
         .trake-row label {
             font-weight: bold;
             font-size: 13px;
-            color: #333;
+            color: #3b82f6;
             min-width: 65px;
         }
         .trake-row input {
             flex: 1;
             padding: 8px 12px;
-            border: 1px solid #ccc;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: white;
             border-radius: 4px;
             font-size: 14px;
         }
@@ -80,22 +82,22 @@
                 <button id="searchOcrImgBtn" style="padding: 8px; background: #4f46e5; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🚀 TÌM KIẾM ẢNH TƯƠNG ĐỒNG (IMAGE-TO-IMAGE)</button>
             </div>
 
-            <!-- 4 Ô nhập riêng cho TraKE -->
+            <!-- 4 Ô nhập cố định cho TraKE -->
             <div class="trake-inputs-container" id="trakeBox">
                 <div class="trake-row">
-                    <label>Khoảnh 1:</label>
+                    <label>E1:</label>
                     <input type="text" id="trakeInput1" placeholder="Nhập sự kiện 1 (vd: giậm nhảy)..." />
                 </div>
                 <div class="trake-row">
-                    <label>Khoảnh 2:</label>
+                    <label>E2:</label>
                     <input type="text" id="trakeInput2" placeholder="Nhập sự kiện 2 (vd: bay qua xà)..." />
                 </div>
                 <div class="trake-row">
-                    <label>Khoảnh 3:</label>
+                    <label>E3:</label>
                     <input type="text" id="trakeInput3" placeholder="Nhập sự kiện 3 (vd: tiếp đất)..." />
                 </div>
                 <div class="trake-row">
-                    <label>Khoảnh 4:</label>
+                    <label>E4:</label>
                     <input type="text" id="trakeInput4" placeholder="Nhập sự kiện 4 (vd: đứng dậy)..." />
                 </div>
                 <button id="searchTrakeBtn" style="margin-top: 4px; padding: 10px; background: #2563eb; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🚀 TÌM KIẾM CHUỖI TraKE</button>
@@ -391,7 +393,6 @@
             formData.append("file", selectedOcrFile);
 
             try {
-                // Đổi thành endpoint image-to-image tương ứng trên backend của bạn nếu có (ví dụ /api/image_search)
                 const response = await fetch(`http://127.0.0.1:8000/api/search?prompt=image_query&top_k=50`, {
                     method: 'POST',
                     body: formData
@@ -408,7 +409,7 @@
             }
         }
 
-        // Tìm kiếm TraKE
+        // Tìm kiếm TraKE với đúng 4 ô cố định
         async function performTrakeSearch() {
             const queries = trakeInputs.map(input => input.value.trim());
             if (queries.every(q => q === "")) {
@@ -416,7 +417,7 @@
                 return;
             }
 
-            statusBar.textContent = "⏱️ Đang xử lý truy vấn chuỗi khoảng khắc TraKE...";
+            statusBar.textContent = "⏱️ Đang xử lý truy vấn chuỗi khoảnh khắc TraKE...";
             try {
                 const response = await fetch(`http://127.0.0.1:8000/api/trake?q1=${encodeURIComponent(queries[0])}&q2=${encodeURIComponent(queries[1])}&q3=${encodeURIComponent(queries[2])}&q4=${encodeURIComponent(queries[3])}`);
                 const data = await response.json();
