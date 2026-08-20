@@ -45,7 +45,6 @@
         .drop-zone p { margin: 0; font-size: 13px; color: #475569; }
         #ocrPreviewImg { max-height: 80px; margin-top: 5px; display: none; border-radius: 4px; }
         
-        /* CSS cho hệ thống nhiều tab kết hợp & nút Clear trên thanh tính năng */
         .feature-tabs {
             display: flex;
             gap: 6px;
@@ -67,7 +66,6 @@
             color: white;
             border-color: #60a5fa;
         }
-        /* Style riêng cho nút VQA khi được chọn kết hợp */
         .tab-btn.vqa-active {
             background: #10b981;
             color: white;
@@ -83,7 +81,31 @@
             background: #dc2626;
         }
 
-        /* VQA Answer Box ở Sidebar phải */
+        .trake-actions-bar {
+            display: none;
+            gap: 8px;
+            margin-top: 5px;
+            align-items: center;
+        }
+        .trake-action-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-confirm-trake {
+            background: #10b981;
+            color: white;
+        }
+        .btn-confirm-trake:hover { background: #059669; }
+        .btn-back-trake {
+            background: #f59e0b;
+            color: white;
+        }
+        .btn-back-trake:hover { background: #d97706; }
+
         .vqa-answer-container {
             margin-top: 10px;
             background: #0f172a;
@@ -106,6 +128,18 @@
             color: white;
             border-radius: 4px;
             font-size: 0.85rem;
+        }
+
+        .image-card.trake-locked {
+            border: 2px solid #10b981 !important;
+            opacity: 0.85;
+        }
+
+        /* Định dạng Gallery dạng 4 cột chuẩn cho TraKE */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 12px;
         }
     </style>
 </head>
@@ -141,7 +175,6 @@
 
         <div class="main-layout">
             <div class="left-content">
-                <!-- Thanh tính năng cho phép chọn chính + VQA kết hợp + nút Clear -->
                 <div class="feature-tabs">
                     <button class="tab-btn active" data-mode="semantic">Semantic</button>
                     <button class="tab-btn" data-mode="ocr">OCR</button>
@@ -150,6 +183,12 @@
                     <button class="tab-btn" data-mode="trake">TraKE</button>
                     <button class="tab-btn clear-btn" id="clearAllBtn">🧹 Clear</button>
                 </div>
+
+                <div class="trake-actions-bar" id="trakeActionsBar">
+                    <button class="trake-action-btn btn-confirm-trake" id="confirmTrakeFrameBtn">✔️ Xác nhận Frame</button>
+                    <button class="trake-action-btn btn-back-trake" id="backTrakeFrameBtn">↩️ Back (Hủy frame cuối)</button>
+                </div>
+
                 <div class="status-bar" id="statusBar">Đang ở chế độ Semantic Search.</div>
                 <div class="gallery" id="resultGallery"></div>
             </div>
@@ -169,11 +208,9 @@
                     <p><strong>Path:</strong> <span id="metaPath">---</span></p>
                 </div>
                 
-                <!-- Hộp thao tác tạo file CSV Submission -->
                 <div class="api-submit-box">
                     <h4>TẠO FILE CSV SUBMISSION</h4>
                     
-                    <!-- Ô điền đáp án VQA (nằm trên ô nhập tên file) -->
                     <div class="vqa-answer-container" id="vqaAnswerBox">
                         <label>ĐÁP ÁN VQA (NẾU CÓ KẾT HỢP):</label>
                         <input type="text" id="vqaInputVal" placeholder="Nhập đáp án..." />
@@ -209,6 +246,9 @@
         const clearAllBtn = document.getElementById('clearAllBtn');
         const trakeQueueInfo = document.getElementById('trakeQueueInfo');
         const trakeCount = document.getElementById('trakeCount');
+        const trakeActionsBar = document.getElementById('trakeActionsBar');
+        const confirmTrakeFrameBtn = document.getElementById('confirmTrakeFrameBtn');
+        const backTrakeFrameBtn = document.getElementById('backTrakeFrameBtn');
 
         const resultGallery = document.getElementById('resultGallery');
         const statusBar = document.getElementById('statusBar');
@@ -217,31 +257,33 @@
         const detailVideo = document.getElementById('detailVideo');
         const detailVideoSource = detailVideo.querySelector('source');
 
-        let primaryMode = 'semantic'; // Tab chính quyết định tìm kiếm (semantic, ocr, asr, trake)
-        let isVqaCombined = false;   // Trạng thái có bật VQA kết hợp hay không
+        let primaryMode = 'semantic'; 
+        let isVqaCombined = false;    
         let selectedOcrFile = null;
         let trakeSelectedFrames = []; 
+        let currentSelectedCardItem = null;
 
         const tabConfigs = {
             'semantic': { placeholder: 'Nhập từ khóa truy vấn ngữ nghĩa...', status: '🔍 Đang ở chế độ Semantic Search.' },
             'ocr': { status: '🔤 Đang ở chế độ OCR.' },
             'asr': { placeholder: 'Nhập từ khóa lời thoại...', status: '🎙️ Đang ở chế độ ASR Search.' },
             'vqa': { status: '🤖 Đã kích hoạt VQA kết hợp.' },
-            'trake': { status: '⏱️ Đang ở chế độ TraKE (Bấm lần lượt các khung hình liên tiếp).' }
+            'trake': { status: '⏱️ Đang ở chế độ TraKE (Chọn frame rồi bấm Xác nhận).' }
         };
 
         function updateUIState() {
-            // Reset hiển thị các ô tìm kiếm phía trên dựa theo primaryMode
             singleSearchBox.style.display = 'none';
             ocrBox.style.display = 'none';
             trakeBox.style.display = 'none';
             trakeQueueInfo.style.display = 'none';
+            trakeActionsBar.style.display = 'none';
 
             if (primaryMode === 'ocr') {
                 ocrBox.style.display = 'flex';
             } else if (primaryMode === 'trake') {
                 trakeBox.style.display = 'flex';
                 trakeQueueInfo.style.display = 'block';
+                trakeActionsBar.style.display = 'flex';
             } else {
                 singleSearchBox.style.display = 'flex';
                 if (tabConfigs[primaryMode] && tabConfigs[primaryMode].placeholder) {
@@ -249,19 +291,16 @@
                 }
             }
 
-            // Cập nhật câu thông báo trạng thái kết hợp
             let modeDesc = primaryMode.toUpperCase();
             if (isVqaCombined) modeDesc += " + VQA";
             statusBar.textContent = `🚀 Chế độ hiện tại: ${modeDesc}`;
         }
 
-        // Xử lý sự kiện bấm các nút trên thanh tính năng
         document.querySelectorAll('.tab-btn:not(.clear-btn)').forEach(button => {
             button.addEventListener('click', () => {
                 const mode = button.getAttribute('data-mode');
 
                 if (mode === 'vqa') {
-                    // Bấm VQA là để bật/tắt chế độ kết hợp VQA độc lập
                     isVqaCombined = !isVqaCombined;
                     if (isVqaCombined) {
                         button.classList.add('vqa-active');
@@ -269,7 +308,6 @@
                         button.classList.remove('vqa-active');
                     }
                 } else {
-                    // Chọn tab chính (Semantic, OCR, ASR, TraKE)
                     document.querySelectorAll('.tab-btn:not([data-mode="vqa"], .clear-btn)').forEach(b => b.classList.remove('active'));
                     button.classList.add('active');
                     primaryMode = mode;
@@ -277,23 +315,24 @@
                     if (primaryMode === 'trake') {
                         trakeSelectedFrames = [];
                         trakeCount.textContent = '0';
+                        currentSelectedCardItem = null;
                     }
                 }
                 updateUIState();
             });
         });
 
-        // Nút Clear tổng: Reset mọi thứ về mặc định ban đầu (chỉ Semantic, không kết hợp VQA)
         clearAllBtn.addEventListener('click', () => {
             primaryMode = 'semantic';
             isVqaCombined = false;
             vqaInputVal.value = '';
             trakeSelectedFrames = [];
             trakeCount.textContent = '0';
+            currentSelectedCardItem = null;
 
-            // Reset class active trên giao diện tab
             document.querySelectorAll('.tab-btn:not(.clear-btn)').forEach(b => b.classList.remove('active', 'vqa-active'));
             document.querySelector('[data-mode="semantic"]').classList.add('active');
+            document.querySelectorAll('.image-card').forEach(c => c.classList.remove('trake-locked', 'selected'));
 
             updateUIState();
         });
@@ -362,6 +401,11 @@
                 card.className = 'image-card';
                 const imgUrl = `http://127.0.0.1:8000/api/image?path=${encodeURIComponent(item.image_path)}`;
                 const filename = getFilename(item.image_path);
+                const cleanId = String(item.frame_id ?? '').replace("#", "").trim();
+
+                if (primaryMode === 'trake' && trakeSelectedFrames.includes(cleanId)) {
+                    card.classList.add('trake-locked');
+                }
 
                 card.innerHTML = `
                     <div class="image-wrapper">
@@ -373,6 +417,10 @@
                 `;
 
                 card.addEventListener('click', () => {
+                    if (primaryMode === 'trake' && trakeSelectedFrames.includes(cleanId)) {
+                        return;
+                    }
+
                     previewPlaceholder.style.display = 'none';
                     detailImg.src = imgUrl;
                     detailImg.style.display = 'block';
@@ -384,18 +432,60 @@
                     seekVideoToKeyframe(item);
 
                     if (primaryMode === 'trake') {
-                        const cleanId = String(item.frame_id).replace("#", "").trim();
-                        trakeSelectedFrames.push(cleanId);
-                        trakeCount.textContent = trakeSelectedFrames.length;
-                        statusBar.textContent = `⏱️ TraKE đã chọn: ${trakeSelectedFrames.join(', ')}`;
+                        currentSelectedCardItem = { cardElement: card, frameId: cleanId };
                     }
 
-                    document.querySelectorAll('.image-card').forEach(c => c.classList.remove('selected'));
+                    document.querySelectorAll('.image-card').forEach(c => {
+                        if (!c.classList.contains('trake-locked')) c.classList.remove('selected');
+                    });
                     card.classList.add('selected');
                 });
                 resultGallery.appendChild(card);
             });
         }
+
+        confirmTrakeFrameBtn.addEventListener('click', () => {
+            if (!currentSelectedCardItem) {
+                alert("Vui lòng bấm chọn một khung hình bên trái trước khi xác nhận!");
+                return;
+            }
+            if (trakeSelectedFrames.length >= 4) {
+                alert("Bạn đã chọn tối đa 4 khung hình cho TraKE!");
+                return;
+            }
+
+            const { cardElement, frameId } = currentSelectedCardItem;
+            if (trakeSelectedFrames.includes(frameId)) {
+                alert("Khung hình này đã được chọn trước đó, không được chọn trùng lại!");
+                return;
+            }
+
+            trakeSelectedFrames.push(frameId);
+            trakeCount.textContent = trakeSelectedFrames.length;
+            
+            cardElement.classList.remove('selected');
+            cardElement.classList.add('trake-locked');
+            currentSelectedCardItem = null;
+
+            statusBar.textContent = `⏱️ TraKE đã chốt: [${trakeSelectedFrames.join(', ')}]`;
+        });
+
+        backTrakeFrameBtn.addEventListener('click', () => {
+            if (trakeSelectedFrames.length === 0) {
+                alert("Chưa có khung hình nào được xác nhận để Back!");
+                return;
+            }
+
+            trakeSelectedFrames.pop();
+            trakeCount.textContent = trakeSelectedFrames.length;
+
+            // Xây dựng lại trạng thái khóa của thẻ dựa trên danh sách hiện tại
+            document.querySelectorAll('.image-card').forEach(card => {
+                card.classList.remove('trake-locked');
+            });
+
+            statusBar.textContent = `⏱️ Đã hủy frame cuối. TraKE hiện tại: [${trakeSelectedFrames.join(', ')}]`;
+        });
 
         async function loadRandomKeyframes() {
             try {
@@ -409,7 +499,6 @@
             const prompt = queryInput.value.trim();
             if (!prompt) return;
             try {
-                // Việc tìm kiếm luôn tuân theo primaryMode (ví dụ: semantic, asr...) hoàn toàn độc lập với việc có bật VQA kết hợp hay không
                 const endpoint = (primaryMode === 'asr') ? 'search-asr' : 'search'; 
                 const res = await fetch(`http://127.0.0.1:8000/api/${endpoint}?prompt=${encodeURIComponent(prompt)}&top_k=50`);
                 const data = await res.json();
@@ -417,7 +506,95 @@
             } catch (e) {}
         }
 
-        // Sự kiện click nút ghi nhận CSV (Lưu ý: Nếu bật VQA kết hợp thì activeMode đổi thành 'vqa')
+        async function performOcrTextSearch() {
+            const textQuery = ocrTextInput.value.trim();
+            if (!textQuery) {
+                alert("Vui lòng nhập văn bản OCR cần tìm!");
+                return;
+            }
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/search/ocr?prompt=${encodeURIComponent(textQuery)}&top_k=50`);
+                const data = await res.json();
+                if (data.results) {
+                    renderGallery(data.results);
+                } else {
+                    alert("Không tìm thấy kết quả phù hợp.");
+                }
+            } catch (err) {
+                alert("❌ Không thể kết nối tới Server khi tìm OCR text.");
+            }
+        }
+
+        searchOcrTextBtn.addEventListener('click', performOcrTextSearch);
+        ocrTextInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performOcrTextSearch();
+        });
+
+        async function performOcrImageSearch() {
+            if (!selectedOcrFile) {
+                alert("Vui lòng chọn hoặc kéo thả một hình ảnh để tìm kiếm!");
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append("file", selectedOcrFile);
+
+            try {
+                statusBar.textContent = "⏳ Đang tải ảnh lên và tìm kiếm...";
+                const res = await fetch(`http://127.0.0.1:8000/api/search/image`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.results) {
+                    renderGallery(data.results);
+                    statusBar.textContent = `🚀 Tìm kiếm ảnh hoàn tất (${data.results.length} kết quả)`;
+                } else {
+                    alert("Không tìm thấy ảnh tương đồng.");
+                }
+            } catch (err) {
+                alert("❌ Lỗi kết nối khi gửi ảnh tìm kiếm.");
+                statusBar.textContent = "❌ Lỗi tìm kiếm ảnh.";
+            }
+        }
+
+        searchOcrImgBtn.addEventListener('click', performOcrImageSearch);
+
+        async function performTrakeSearch() {
+            const t1 = document.getElementById('trakeInput1').value.trim();
+            const t2 = document.getElementById('trakeInput2').value.trim();
+            const t3 = document.getElementById('trakeInput3').value.trim();
+            const t4 = document.getElementById('trakeInput4').value.trim();
+
+            if (!t1 && !t2 && !t3 && !t4) {
+                alert("Vui lòng nhập ít nhất một sự kiện cho chuỗi TraKE!");
+                return;
+            }
+
+            try {
+                statusBar.textContent = "⏳ Đang xử lý chuỗi truy vấn TraKE...";
+                const res = await fetch(`http://127.0.0.1:8000/api/search/trake`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trek1: t1, trek2: t2, trek3: t3, trek4: t4, trek5: "" })
+                });
+                const data = await res.json();
+                if (data.results) {
+                    // Sắp xếp giảm dần theo score trước khi hiển thị nếu API chưa tự sắp xếp
+                    const sortedResults = data.results.sort((a, b) => (b.score || 0) - (a.score || 0));
+                    renderGallery(sortedResults);
+                    statusBar.textContent = `🚀 TraKE: Tìm thấy ${sortedResults.length} kết quả (Hiển thị theo hàng 4 frames)`;
+                } else {
+                    alert("Không tìm thấy kết quả TraKE phù hợp.");
+                }
+            } catch (err) {
+                alert("❌ Lỗi kết nối tới Server TraKE.");
+                statusBar.textContent = "❌ Lỗi tìm kiếm TraKE.";
+            }
+        }
+
+        searchTrakeBtn.addEventListener('click', performTrakeSearch);
+
         document.getElementById('saveCsvBtn').addEventListener('click', async () => {
             const filenameInput = document.getElementById('csvFilenameInput').value.trim();
             const metaPathText = document.getElementById('metaPath').textContent.trim();
@@ -436,14 +613,13 @@
             let frameIdParam = "";
             let activeMode = primaryMode;
 
-            // Nếu đang bật VQA kết hợp và không phải mode TraKE thì ưu tiên chuyển sang cơ chế VQA
             if (isVqaCombined && primaryMode !== 'trake') {
                 activeMode = 'vqa';
             }
 
             if (activeMode === 'trake') {
                 if (trakeSelectedFrames.length === 0) {
-                    alert("Vui lòng bấm chọn các frame tuần tự bên trái trước khi lưu TraKE!");
+                    alert("Vui lòng bấm chọn và Xác nhận các frame bên trái trước khi lưu TraKE!");
                     return;
                 }
                 frameIdParam = trakeSelectedFrames.join(",");
@@ -461,6 +637,7 @@
                     if (activeMode === 'trake') {
                         trakeSelectedFrames = [];
                         trakeCount.textContent = '0';
+                        document.querySelectorAll('.image-card').forEach(c => c.classList.remove('trake-locked'));
                     }
                 } else {
                     alert(`❌ Lỗi: ${data.message}`);
