@@ -293,7 +293,7 @@
 
             let modeDesc = primaryMode.toUpperCase();
             if (isVqaCombined) modeDesc += " + VQA";
-            statusBar.textContent = `🚀 Chế độ hiện tại: ${modeDesc}`;
+            statusBar.textContent =🚀 Chế độ hiện tại: ${modeDesc}`;
         }
 
         document.querySelectorAll('.tab-btn:not(.clear-btn)').forEach(button => {
@@ -363,14 +363,14 @@
             const ss = Math.floor(seconds % 60);
             const mmm = Math.floor((seconds % 1) * 1000);
             const pad = (n, len = 2) => String(n).padStart(len, '0');
-            return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(mmm, 3)}`;
+            return ${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(mmm, 3)};
         }
 
         function formatSecondsToShort(seconds) {
             seconds = Math.max(0, Number(seconds) || 0);
             const mm = Math.floor(seconds / 60);
             const ss = Math.floor(seconds % 60);
-            return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+            return ${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')};
         }
 
         function getFilename(imagePath) {
@@ -380,7 +380,7 @@
 
         function seekVideoToKeyframe(item) {
             if (!item.video_name) return;
-            const videoUrl = `http://127.0.0.1:8000/api/video?video_name=${encodeURIComponent(item.video_name)}`;
+            const videoUrl = http://127.0.0.1:8000/api/video?video_name=${encodeURIComponent(item.video_name)};
             const targetSeconds = Number(item.pts_time) || 0;
             const doSeek = () => {
                 try { detailVideo.currentTime = targetSeconds; detailVideo.muted = false; detailVideo.play().catch(() => {}); } catch(e){}
@@ -399,7 +399,7 @@
             results.forEach((item) => {
                 const card = document.createElement('div');
                 card.className = 'image-card';
-                const imgUrl = `http://127.0.0.1:8000/api/image?path=${encodeURIComponent(item.image_path)}`;
+                const imgUrl = http://127.0.0.1:8000/api/image?path=${encodeURIComponent(item.image_path)};
                 const filename = getFilename(item.image_path);
                 const cleanId = String(item.frame_id ?? '').replace("#", "").trim();
 
@@ -425,7 +425,7 @@
                     detailImg.src = imgUrl;
                     detailImg.style.display = 'block';
 
-                    document.getElementById('metaFrameId').textContent = `#${item.frame_id ?? '-----'}`;
+                    document.getElementById('metaFrameId').textContent = #${item.frame_id ?? '-----'};
                     document.getElementById('metaTime').textContent = formatSecondsToTimecode(item.pts_time);
                     document.getElementById('metaPath').textContent = item.image_path || filename;
 
@@ -467,7 +467,7 @@
             cardElement.classList.add('trake-locked');
             currentSelectedCardItem = null;
 
-            statusBar.textContent = `⏱️ TraKE đã chốt: [${trakeSelectedFrames.join(', ')}]`;
+            statusBar.textContent = ⏱️ TraKE đã chốt: [${trakeSelectedFrames.join(', ')}];
         });
 
         backTrakeFrameBtn.addEventListener('click', () => {
@@ -484,12 +484,12 @@
                 card.classList.remove('trake-locked');
             });
 
-            statusBar.textContent = `⏱️ Đã hủy frame cuối. TraKE hiện tại: [${trakeSelectedFrames.join(', ')}]`;
+            statusBar.textContent = ⏱️ Đã hủy frame cuối. TraKE hiện tại: [${trakeSelectedFrames.join(', ')}];
         });
 
         async function loadRandomKeyframes() {
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/random?limit=50`);
+                const res = await fetch(http://127.0.0.1:8000/api/random?limit=50);
                 const data = await res.json();
                 if (data.results) renderGallery(data.results);
             } catch (e) {}
@@ -500,7 +500,7 @@
             if (!prompt) return;
             try {
                 const endpoint = (primaryMode === 'asr') ? 'search-asr' : 'search'; 
-                const res = await fetch(`http://127.0.0.1:8000/api/${endpoint}?prompt=${encodeURIComponent(prompt)}&top_k=50`);
+                const res = await fetch(http://127.0.0.1:8000/api/${endpoint}?prompt=${encodeURIComponent(prompt)}&top_k=50);
                 const data = await res.json();
                 if (data.results) renderGallery(data.results);
             } catch (e) {}
@@ -513,7 +513,7 @@
                 return;
             }
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/search/ocr?prompt=${encodeURIComponent(textQuery)}&top_k=50`);
+                const res = await fetch(http://127.0.0.1:8000/api/search/ocr?prompt=${encodeURIComponent(textQuery)}&top_k=50);
                 const data = await res.json();
                 if (data.results) {
                     renderGallery(data.results);
@@ -541,14 +541,14 @@
 
             try {
                 statusBar.textContent = "⏳ Đang tải ảnh lên và tìm kiếm...";
-                const res = await fetch(`http://127.0.0.1:8000/api/search/image`, {
+                const res = await fetch(http://127.0.0.1:8000/api/search/image, {
                     method: 'POST',
                     body: formData
                 });
                 const data = await res.json();
                 if (data.results) {
                     renderGallery(data.results);
-                    statusBar.textContent = `🚀 Tìm kiếm ảnh hoàn tất (${data.results.length} kết quả)`;
+                    statusBar.textContent =🚀 Tìm kiếm ảnh hoàn tất (${data.results.length} kết quả)`;
                 } else {
                     alert("Không tìm thấy ảnh tương đồng.");
                 }
@@ -573,17 +573,22 @@
 
             try {
                 statusBar.textContent = "⏳ Đang xử lý chuỗi truy vấn TraKE...";
-                const res = await fetch(`http://127.0.0.1:8000/api/search/trake`, {
+                const res = await fetch(http://127.0.0.1:8000/api/search/trake, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ trek1: t1, trek2: t2, trek3: t3, trek4: t4, trek5: "" })
                 });
                 const data = await res.json();
                 if (data.results) {
-                    // Sắp xếp giảm dần theo score trước khi hiển thị nếu API chưa tự sắp xếp
-                    const sortedResults = data.results.sort((a, b) => (b.score || 0) - (a.score || 0));
-                    renderGallery(sortedResults);
-                    statusBar.textContent = `🚀 TraKE: Tìm thấy ${sortedResults.length} kết quả (Hiển thị theo hàng 4 frames)`;
+                    // QUAN TRỌNG: KHÔNG sắp xếp lại ở đây!
+                    // Backend đã trả về đúng thứ tự: mỗi chuỗi 4 ảnh theo đúng
+                    // E1 -> E2 -> E3 -> E4 (thời gian/frame_id tăng dần), và các
+                    // chuỗi đã được xếp theo tổng điểm (total_score) giảm dần.
+                    // Nếu sort lại theo score của TỪNG ảnh riêng lẻ (như bản cũ)
+                    // sẽ làm xáo trộn thứ tự E1-E4 trong mỗi hàng 4 ảnh, gây ra
+                    // hiện tượng ảnh hiển thị "ngược" so với thứ tự sự kiện.
+                    renderGallery(data.results);
+                    statusBar.textContent =🚀 TraKE: Tìm thấy ${data.results.length} kết quả (Hiển thị theo hàng 4 frames)`;
                 } else {
                     alert("Không tìm thấy kết quả TraKE phù hợp.");
                 }
@@ -628,19 +633,19 @@
             }
 
             try {
-                const url = `http://127.0.0.1:8000/api/submit-csv?mode=${activeMode}&video_name=${encodeURIComponent(videoName)}&frame_id=${encodeURIComponent(frameIdParam)}&filename=${encodeURIComponent(filenameInput)}&vqa_answer=${encodeURIComponent(vqaVal)}`;
+                const url = http://127.0.0.1:8000/api/submit-csv?mode=${activeMode}&video_name=${encodeURIComponent(videoName)}&frame_id=${encodeURIComponent(frameIdParam)}&filename=${encodeURIComponent(filenameInput)}&vqa_answer=${encodeURIComponent(vqaVal)};
                 const res = await fetch(url, { method: 'POST' });
                 const data = await res.json();
                 
                 if (data.status === 'success') {
-                    alert(`✅ Lưu thành công vào file ${filenameInput}.csv (Mode: ${activeMode.toUpperCase()})!`);
+                    alert(✅ Lưu thành công vào file ${filenameInput}.csv (Mode: ${activeMode.toUpperCase()})!);
                     if (activeMode === 'trake') {
                         trakeSelectedFrames = [];
                         trakeCount.textContent = '0';
                         document.querySelectorAll('.image-card').forEach(c => c.classList.remove('trake-locked'));
                     }
                 } else {
-                    alert(`❌ Lỗi: ${data.message}`);
+                    alert(❌ Lỗi: ${data.message});
                 }
             } catch (err) {
                 alert("❌ Không thể kết nối tới Server.");
