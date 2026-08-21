@@ -7,7 +7,7 @@ client = QdrantClient("http://localhost:6333")
 collection_name = "bge-m3audio"
 
 # 2. Đọc file JSON đã gom từ Kaggle
-input_json_path = "Final_Payload_ASR_Clean.json" 
+input_json_path = "FinalASR.json" 
 
 print(f"📂 Đang đọc dữ liệu từ {input_json_path}...")
 with open(input_json_path, "r", encoding="utf-8") as f:
