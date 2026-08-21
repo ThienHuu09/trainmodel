@@ -1,4 +1,4 @@
-## pip install -r requirements.txt
+ pip install -r requirements.txt
 
 trake embedding: https://www.kaggle.com/datasets/bivnvinh/json-cui-cng
 
