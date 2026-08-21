@@ -1,3 +1,5 @@
+## pip install -r requirements.txt
+
 trake embedding: https://www.kaggle.com/datasets/bivnvinh/json-cui-cng
 
 ocr embedding : https://www.kaggle.com/datasets/thinhunguyn/ocrhehe
@@ -25,3 +27,4 @@ C:\AIC2026\
 └── Mfusion-VR-Web/             # Thư mục mã nguồn hệ thống web chính
     ├── frontend/               # Thư mục giao diện (chứa file index.html và style.css)
     ├── server.py               # File cấu hình và chạy FastAPI Backend chính
+
