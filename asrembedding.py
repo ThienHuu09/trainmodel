@@ -2,46 +2,70 @@ import json
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
-# 1. Kết nối với Qdrant (thay đổi url nếu Qdrant của bạn chạy trên cloud hoặc port khác)
-client = QdrantClient("http://localhost:6333") 
-collection_name = "bge-m3audio"
+QDRANT_URL = "http://localhost:6333"
+COLLECTION_NAME = "bge-m3audio"
+JSON_FILE_PATH = r"C:\AIC2026\FinalASR.json"
 
-# 2. Đọc file JSON đã gom từ Kaggle
-input_json_path = "FinalASR.json" 
+def main():
+    print("⏳ Đang kết nối Qdrant...")
+    client = QdrantClient(url=QDRANT_URL, timeout=60)  # tránh lỗi ReadTimeout khi upload lô lớn
 
-print(f"📂 Đang đọc dữ liệu từ {input_json_path}...")
-with open(input_json_path, "r", encoding="utf-8") as f:
-    data = json.load(f)
+    vector_size = 1024  # bge-m3 dense embedding = 1024 chiều
 
-# 3. Chuyển đổi dữ liệu sang định dạng PointStruct để đẩy lên Qdrant
-points = []
-for item in data:
-    points.append(
-        models.PointStruct(
-            id=item["id"],
-            vector=item["embedding"],
-            payload={
-                "video_name": item["video_name"],
-                "asr_start": item["asr_start"],
-                "asr_end": item["asr_end"],
-                "text": item["text"],
-                "pts_time": item["pts_time"],
-                "frame_id": item["frame_id"],
-                "image_path": item["image_path"]
-            }
+    if client.collection_exists(collection_name=COLLECTION_NAME):
+        print(f"🗑️ Xóa collection cũ '{COLLECTION_NAME}'...")
+        client.delete_collection(collection_name=COLLECTION_NAME)
+
+    print(f"✨ Tạo mới collection '{COLLECTION_NAME}' (size={vector_size}, Cosine)...")
+    client.create_collection(
+        collection_name=COLLECTION_NAME,
+        vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE)
+    )
+
+    print(f"📂 Đang đọc file JSON: {JSON_FILE_PATH}...")
+    with open(JSON_FILE_PATH, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    print(f"📦 Tổng số bản ghi trong file: {len(data)}")
+    points = []
+    skipped_count = 0
+
+    for item in data:
+        vector_data = item.get("embedding")
+
+        # Bỏ qua bản ghi thiếu embedding để tránh sập code
+        if vector_data is None or len(vector_data) == 0:
+            skipped_count += 1
+            continue
+
+        points.append(
+            models.PointStruct(
+                id=int(item.get("id")),  # dùng id có sẵn trong file, không tự đánh index nữa
+                vector=vector_data,
+                payload={
+                    "video_name": str(item.get("video_name", "")),
+                    "text": str(item.get("text", "")),
+                    "asr_start": float(item.get("asr_start", 0)),
+                    "asr_end": float(item.get("asr_end", 0)),
+                    "pts_time": float(item.get("pts_time", 0)),
+                    "frame_id": int(item.get("frame_id", 0)),
+                    "image_path": str(item.get("image_path", "")),
+                }
+            )
         )
-    )
 
-# 4. Upsert theo batch (mỗi batch 100-500 điểm để tránh treo kết nối)
-batch_size = 500
-print(f"🚀 Đang bắt đầu đẩy {len(points)} bản ghi lên collection '{collection_name}'...")
+    if skipped_count > 0:
+        print(f"⚠️ Đã bỏ qua {skipped_count} bản ghi bị thiếu embedding.")
+    print(f"📦 Số bản ghi hợp lệ sẽ đẩy lên Qdrant: {len(points)}")
 
-for i in range(0, len(points), batch_size):
-    batch = points[i : i + batch_size]
-    client.upsert(
-        collection_name=collection_name,
-        points=batch
-    )
-    print(f"✅ Đã đẩy batch từ {i} đến {min(i + batch_size, len(points))}")
+    batch_size = 1000
+    print("🚀 Bắt đầu upload ASR lên Qdrant...")
+    for i in range(0, len(points), batch_size):
+        batch = points[i:i + batch_size]
+        client.upsert(collection_name=COLLECTION_NAME, points=batch)
+        print(f"✅ Đã upload batch {i} -> {min(i + batch_size, len(points))}")
 
-print("🎉 Hoàn tất toàn bộ dữ liệu!")
+    print("🎉 Hoàn tất upload ASR!")
+
+if name == "main":
+    main()
