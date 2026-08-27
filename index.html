@@ -6,7 +6,6 @@
     <title>N0N-L1NERS</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* CSS bổ sung cho box TraKE và OCR Image-to-Image */
         .trake-inputs-container, .ocr-image-box {
             display: none; 
             flex-direction: column;
@@ -33,7 +32,6 @@
             border-radius: 4px;
             font-size: 14px;
         }
-        /* Style cho Drop Zone Image-to-Image của OCR */
         .drop-zone {
             border: 2px dashed #4f46e5;
             padding: 15px;
@@ -43,32 +41,116 @@
             cursor: pointer;
             transition: background 0.2s;
         }
-        .drop-zone:hover {
-            background: #f1f5f9;
+        .drop-zone:hover { background: #f1f5f9; }
+        .drop-zone p { margin: 0; font-size: 13px; color: #475569; }
+        #ocrPreviewImg { max-height: 80px; margin-top: 5px; display: none; border-radius: 4px; }
+        
+        .feature-tabs {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
         }
-        .drop-zone p {
-            margin: 0;
-            font-size: 13px;
-            color: #475569;
+        .tab-btn {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
         }
-        #ocrPreviewImg {
-            max-height: 80px;
-            margin-top: 5px;
+        .tab-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #60a5fa;
+        }
+        .tab-btn.vqa-active {
+            background: #10b981;
+            color: white;
+            border-color: #34d399;
+        }
+        .tab-btn.clear-btn {
+            background: #ef4444;
+            color: white;
+            border-color: #f87171;
+            margin-left: auto;
+        }
+        .tab-btn.clear-btn:hover {
+            background: #dc2626;
+        }
+
+        .trake-actions-bar {
             display: none;
+            gap: 8px;
+            margin-top: 5px;
+            align-items: center;
+        }
+        .trake-action-btn {
+            padding: 6px 12px;
             border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-confirm-trake {
+            background: #10b981;
+            color: white;
+        }
+        .btn-confirm-trake:hover { background: #059669; }
+        .btn-back-trake {
+            background: #f59e0b;
+            color: white;
+        }
+        .btn-back-trake:hover { background: #d97706; }
+
+        .vqa-answer-container {
+            margin-top: 10px;
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+        }
+        .vqa-answer-container label {
+            font-size: 0.8rem;
+            color: #10b981;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .vqa-answer-container input {
+            width: 100%;
+            padding: 8px;
+            background: #1e293b;
+            border: 1px solid #475569;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .image-card.trake-locked {
+            border: 2px solid #10b981 !important;
+            opacity: 0.85;
+        }
+
+        /* Định dạng Gallery dạng 4 cột chuẩn cho TraKE */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 12px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="top-search-container">
-            <!-- Ô nhập chuẩn cho Semantic, ASR, VQA -->
             <div class="search-bar-box" id="singleSearchBox">
                 <input type="text" id="queryInput" placeholder="Nhập từ khóa truy vấn tại đây (vd: a bird)..." />
                 <button id="searchBtn">🔍 SEARCH</button>
             </div>
 
-            <!-- Box riêng cho OCR: Hỗ trợ cả nhập text lẫn kéo thả ảnh tìm kiếm -->
             <div class="ocr-image-box" id="ocrBox">
                 <div class="search-bar-box" style="margin-bottom: 4px;">
                     <input type="text" id="ocrTextInput" placeholder="Hoặc nhập văn bản OCR cần tìm..." />
@@ -79,27 +161,14 @@
                     <input type="file" id="ocrImageInput" accept="image/*" style="display: none;" />
                     <img id="ocrPreviewImg" src="" alt="Preview Image" />
                 </div>
-                <button id="searchOcrImgBtn" style="padding: 8px; background: #4f46e5; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🚀 TÌM KIẾM ẢNH TƯƠNG ĐỒNG (IMAGE-TO-IMAGE)</button>
+                <button id="searchOcrImgBtn" style="padding: 8px; background: #4f46e5; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🚀 TÌM KIẾM ẢNH TƯƠNG ĐỒNG</button>
             </div>
 
-            <!-- 4 Ô nhập cố định cho TraKE -->
             <div class="trake-inputs-container" id="trakeBox">
-                <div class="trake-row">
-                    <label>E1:</label>
-                    <input type="text" id="trakeInput1" placeholder="Nhập sự kiện 1 (vd: giậm nhảy)..." />
-                </div>
-                <div class="trake-row">
-                    <label>E2:</label>
-                    <input type="text" id="trakeInput2" placeholder="Nhập sự kiện 2 (vd: bay qua xà)..." />
-                </div>
-                <div class="trake-row">
-                    <label>E3:</label>
-                    <input type="text" id="trakeInput3" placeholder="Nhập sự kiện 3 (vd: tiếp đất)..." />
-                </div>
-                <div class="trake-row">
-                    <label>E4:</label>
-                    <input type="text" id="trakeInput4" placeholder="Nhập sự kiện 4 (vd: đứng dậy)..." />
-                </div>
+                <div class="trake-row"><label>E1:</label><input type="text" id="trakeInput1" placeholder="Sự kiện 1..." /></div>
+                <div class="trake-row"><label>E2:</label><input type="text" id="trakeInput2" placeholder="Sự kiện 2..." /></div>
+                <div class="trake-row"><label>E3:</label><input type="text" id="trakeInput3" placeholder="Sự kiện 3..." /></div>
+                <div class="trake-row"><label>E4:</label><input type="text" id="trakeInput4" placeholder="Sự kiện 4..." /></div>
                 <button id="searchTrakeBtn" style="margin-top: 4px; padding: 10px; background: #2563eb; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🚀 TÌM KIẾM CHUỖI TraKE</button>
             </div>
         </div>
@@ -107,13 +176,22 @@
         <div class="main-layout">
             <div class="left-content">
                 <div class="feature-tabs">
-                    <button class="tab-btn active" data-mode="semantic">Semantic Search</button>
+                    <button class="tab-btn active" data-mode="semantic">Semantic</button>
                     <button class="tab-btn" data-mode="ocr">OCR</button>
                     <button class="tab-btn" data-mode="asr">ASR</button>
-                    <button class="tab-btn" data-mode="vqa">VQA</button>
+                    <button class="tab-btn" data-mode="semantic+ocr">semantic+ocr</button>
+                    <button class="tab-btn" data-mode="semantic+asr">semantic+asr</button>
+                    <button class="tab-btn" data-mode="vqa">VQA (Kết hợp)</button>
                     <button class="tab-btn" data-mode="trake">TraKE</button>
+                    <button class="tab-btn clear-btn" id="clearAllBtn">🧹 Clear</button>
                 </div>
-                <div class="status-bar" id="statusBar">Đang khởi động hệ thống...</div>
+
+                <div class="trake-actions-bar" id="trakeActionsBar">
+                    <button class="trake-action-btn btn-confirm-trake" id="confirmTrakeFrameBtn">✔️ Xác nhận Frame</button>
+                    <button class="trake-action-btn btn-back-trake" id="backTrakeFrameBtn">↩️ Back (Hủy frame cuối)</button>
+                </div>
+
+                <div class="status-bar" id="statusBar">Đang ở chế độ Semantic Search.</div>
                 <div class="gallery" id="resultGallery"></div>
             </div>
 
@@ -131,10 +209,21 @@
                     <p><strong>Time:</strong> <span id="metaTime">00:00:00:000</span></p>
                     <p><strong>Path:</strong> <span id="metaPath">---</span></p>
                 </div>
+                
                 <div class="api-submit-box">
-                    <h4>API SUBMIT (BTC)</h4>
-                    <input type="text" id="apiUrlInput" placeholder="http://server-btc.com/submit..." />
-                    <button id="submitBtcBtn">🚀 NỘP BÀI</button>
+                    <h4>TẠO FILE CSV SUBMISSION</h4>
+                    
+                    <div class="vqa-answer-container" id="vqaAnswerBox">
+                        <label>ĐÁP ÁN VQA (NẾU CÓ KẾT HỢP):</label>
+                        <input type="text" id="vqaInputVal" placeholder="Nhập đáp án..." />
+                    </div>
+
+                    <div id="trakeQueueInfo" style="font-size: 0.75rem; color: #38bdf8; margin-bottom: 8px; display: none;">
+                        📌 Đã chọn cho TraKE: <span id="trakeCount">0</span>/4 khung hình
+                    </div>
+
+                    <input type="text" id="csvFilenameInput" placeholder="Nhập tên file (vd: query-p1-11-kis)..." style="margin-top: 8px;" />
+                    <button id="saveCsvBtn">💾 TẠO KEYFRAME (LƯU CSV)</button>
                 </div>
             </div>
         </div>
@@ -155,12 +244,13 @@
 
         const trakeBox = document.getElementById('trakeBox');
         const searchTrakeBtn = document.getElementById('searchTrakeBtn');
-        const trakeInputs = [
-            document.getElementById('trakeInput1'),
-            document.getElementById('trakeInput2'),
-            document.getElementById('trakeInput3'),
-            document.getElementById('trakeInput4')
-        ];
+        const vqaInputVal = document.getElementById('vqaInputVal');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const trakeQueueInfo = document.getElementById('trakeQueueInfo');
+        const trakeCount = document.getElementById('trakeCount');
+        const trakeActionsBar = document.getElementById('trakeActionsBar');
+        const confirmTrakeFrameBtn = document.getElementById('confirmTrakeFrameBtn');
+        const backTrakeFrameBtn = document.getElementById('backTrakeFrameBtn');
 
         const resultGallery = document.getElementById('resultGallery');
         const statusBar = document.getElementById('statusBar');
@@ -169,78 +259,105 @@
         const detailVideo = document.getElementById('detailVideo');
         const detailVideoSource = detailVideo.querySelector('source');
 
-        let currentMode = 'semantic'; 
-        let selectedOcrFile = null; // Lưu file ảnh để gửi API image-to-image
+        let primaryMode = 'semantic'; 
+        let isVqaCombined = false;    
+        let selectedOcrFile = null;
+        let trakeSelectedFrames = []; 
+        let currentSelectedCardItem = null;
 
-        const tabConfig = {
-            'semantic': { placeholder: 'Nhập từ khóa truy vấn ngữ nghĩa (vd: a bird)...', status: '🔍 Đã chuyển sang chế độ Semantic Search.' },
-            'ocr': { status: '🔤 Đã chuyển sang chế độ OCR (Hỗ trợ tìm text hoặc kéo thả ảnh tương đồng).' },
-            'asr': { placeholder: 'Nhập từ khóa lời thoại nhân vật...', status: '🎙️ Đã chuyển sang chế độ ASR Search.' },
-            'vqa': { placeholder: 'Nhập câu hỏi về nội dung khung hình...', status: '🤖 Đã chuyển sang chế độ VQA.' },
-            'trake': { status: '⏱️ Đã chuyển sang chế độ TraKE (Nhập 4 khoảnh khắc liên tiếp).' }
+        const tabConfigs = {
+            'semantic': { placeholder: 'Nhập từ khóa truy vấn ngữ nghĩa...', status: '🔍 Đang ở chế độ Semantic Search.' },
+            'ocr': { status: '🔤 Đang ở chế độ OCR.' },
+            'asr': { placeholder: 'Nhập từ khóa lời thoại...', status: '🎙️ Đang ở chế độ ASR Search.' },
+            'semantic+ocr': { placeholder: 'Nhập truy vấn semantic + ocr...', status: '🔤🔍 Đang ở chế độ Semantic + OCR.' },
+            'semantic+asr': { placeholder: 'Nhập truy vấn semantic + asr...', status: '🎙️🔍 Đang ở chế độ Semantic + ASR.' },
+            'vqa': { status: '🤖 Đã kích hoạt VQA kết hợp.' },
+            'trake': { status: '⏱️ Đang ở chế độ TraKE (Chọn frame rồi bấm Xác nhận).' }
         };
 
-        // Chuyển đổi giao diện các tab
-        document.querySelectorAll('.tab-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                button.classList.add('active');
-                currentMode = button.getAttribute('data-mode');
-                
-                const config = tabConfig[currentMode];
-                if (config) statusBar.textContent = config.status;
+        function updateUIState() {
+            singleSearchBox.style.display = 'none';
+            ocrBox.style.display = 'none';
+            trakeBox.style.display = 'none';
+            trakeQueueInfo.style.display = 'none';
+            trakeActionsBar.style.display = 'none';
 
-                // Ẩn hiện các search box tùy thuộc vào tab đang chọn
-                singleSearchBox.style.display = 'none';
-                ocrBox.style.display = 'none';
-                trakeBox.style.display = 'none';
-
-                if (currentMode === 'ocr') {
-                    ocrBox.style.display = 'flex';
-                } else if (currentMode === 'trake') {
-                    trakeBox.style.display = 'flex';
-                } else {
-                    singleSearchBox.style.display = 'flex';
-                    queryInput.placeholder = config.placeholder;
+            if (primaryMode === 'ocr') {
+                ocrBox.style.display = 'flex';
+            } else if (primaryMode === 'trake') {
+                trakeBox.style.display = 'flex';
+                trakeQueueInfo.style.display = 'block';
+                trakeActionsBar.style.display = 'flex';
+            } else {
+                singleSearchBox.style.display = 'flex';
+                if (tabConfigs[primaryMode] && tabConfigs[primaryMode].placeholder) {
+                    queryInput.placeholder = tabConfigs[primaryMode].placeholder;
                 }
+            }
+
+            let modeDesc = primaryMode.toUpperCase();
+            if (isVqaCombined) modeDesc += " + VQA";
+            statusBar.textContent = `🚀 Chế độ hiện tại: ${modeDesc}`;
+        }
+
+        document.querySelectorAll('.tab-btn:not(.clear-btn)').forEach(button => {
+            button.addEventListener('click', () => {
+                const mode = button.getAttribute('data-mode');
+
+                if (mode === 'vqa') {
+                    isVqaCombined = !isVqaCombined;
+                    if (isVqaCombined) {
+                        button.classList.add('vqa-active');
+                    } else {
+                        button.classList.remove('vqa-active');
+                    }
+                } else {
+                    document.querySelectorAll('.tab-btn:not([data-mode="vqa"], .clear-btn)').forEach(b => b.classList.remove('active'));
+                    button.classList.add('active');
+                    primaryMode = mode;
+                    
+                    if (primaryMode === 'trake') {
+                        trakeSelectedFrames = [];
+                        trakeCount.textContent = '0';
+                        currentSelectedCardItem = null;
+                    }
+                }
+                updateUIState();
             });
         });
 
-        // Xử lý kéo thả và chọn ảnh cho OCR Image-to-Image
+        clearAllBtn.addEventListener('click', () => {
+            primaryMode = 'semantic';
+            isVqaCombined = false;
+            vqaInputVal.value = '';
+            trakeSelectedFrames = [];
+            trakeCount.textContent = '0';
+            currentSelectedCardItem = null;
+
+            document.querySelectorAll('.tab-btn:not(.clear-btn)').forEach(b => b.classList.remove('active', 'vqa-active'));
+            document.querySelector('[data-mode="semantic"]').classList.add('active');
+            document.querySelectorAll('.image-card').forEach(c => c.classList.remove('trake-locked', 'selected'));
+
+            updateUIState();
+        });
+
         dropZone.addEventListener('click', () => ocrImageInput.click());
-        
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.style.background = '#e2e8f0';
-        });
-
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.style.background = '#f8fafc';
-        });
-
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = '#e2e8f0'; });
+        dropZone.addEventListener('dragleave', () => { dropZone.style.background = '#f8fafc'; });
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.style.background = '#f8fafc';
-            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                handleSelectedImage(e.dataTransfer.files[0]);
-            }
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) handleSelectedImage(e.dataTransfer.files[0]);
         });
-
         ocrImageInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files[0]) {
-                handleSelectedImage(e.target.files[0]);
-            }
+            if (e.target.files && e.target.files[0]) handleSelectedImage(e.target.files[0]);
         });
 
         function handleSelectedImage(file) {
             selectedOcrFile = file;
             const reader = new FileReader();
-            reader.onload = (e) => {
-                ocrPreviewImg.src = e.target.result;
-                ocrPreviewImg.style.display = 'block';
-            };
+            reader.onload = (e) => { ocrPreviewImg.src = e.target.result; ocrPreviewImg.style.display = 'block'; };
             reader.readAsDataURL(file);
-            statusBar.textContent = `📁 Đã chọn ảnh: ${file.name}. Bấm nút tìm kiếm tương đồng để bắt đầu!`;
         }
 
         function formatSecondsToTimecode(seconds) {
@@ -269,19 +386,10 @@
             if (!item.video_name) return;
             const videoUrl = `http://127.0.0.1:8000/api/video?video_name=${encodeURIComponent(item.video_name)}`;
             const targetSeconds = Number(item.pts_time) || 0;
-
             const doSeek = () => {
-                try {
-                    detailVideo.currentTime = targetSeconds; 
-                    detailVideo.muted = false; 
-                    detailVideo.play().catch(() => {});
-                } catch (e) {
-                    console.log("Lỗi tua video:", e);
-                }
+                try { detailVideo.currentTime = targetSeconds; detailVideo.muted = false; detailVideo.play().catch(() => {}); } catch(e){}
             };
-
-            const currentSrc = detailVideoSource.getAttribute('src') || "";
-            if (currentSrc.includes(encodeURIComponent(item.video_name))) {
+            if (detailVideoSource.getAttribute('src').includes(encodeURIComponent(item.video_name))) {
                 doSeek();
             } else {
                 detailVideoSource.src = videoUrl;
@@ -297,21 +405,26 @@
                 card.className = 'image-card';
                 const imgUrl = `http://127.0.0.1:8000/api/image?path=${encodeURIComponent(item.image_path)}`;
                 const filename = getFilename(item.image_path);
-                const shortTime = formatSecondsToShort(item.pts_time);
+                const cleanId = String(item.frame_id ?? '').replace("#", "").trim();
+
+                if (primaryMode === 'trake' && trakeSelectedFrames.includes(cleanId)) {
+                    card.classList.add('trake-locked');
+                }
 
                 card.innerHTML = `
                     <div class="image-wrapper">
                         <div class="score-badge">🎯 ${item.score ?? 0}</div>
                         <img src="${imgUrl}" alt="${filename}" loading="lazy">
-                        <div class="timestamp-badge">${shortTime}</div>
-                        <div class="play-overlay"></div>
+                        <div class="timestamp-badge">${formatSecondsToShort(item.pts_time)}</div>
                     </div>
-                    <div class="card-info" title="${filename}">
-                        ${filename.replace(/\.[^/.]+$/, "")}
-                    </div>
+                    <div class="card-info" title="${filename}">${filename.replace(/\.[^/.]+$/, "")}</div>
                 `;
 
                 card.addEventListener('click', () => {
+                    if (primaryMode === 'trake' && trakeSelectedFrames.includes(cleanId)) {
+                        return;
+                    }
+
                     previewPlaceholder.style.display = 'none';
                     detailImg.src = imgUrl;
                     detailImg.style.display = 'block';
@@ -322,129 +435,239 @@
 
                     seekVideoToKeyframe(item);
 
-                    document.querySelectorAll('.image-card').forEach(c => c.classList.remove('selected'));
+                    if (primaryMode === 'trake') {
+                        currentSelectedCardItem = { cardElement: card, frameId: cleanId };
+                    }
+
+                    document.querySelectorAll('.image-card').forEach(c => {
+                        if (!c.classList.contains('trake-locked')) c.classList.remove('selected');
+                    });
                     card.classList.add('selected');
                 });
                 resultGallery.appendChild(card);
             });
         }
 
-        async function loadRandomKeyframes() {
-            statusBar.textContent = "🎲 Đang bốc thăm 50 khung hình ngẫu nhiên...";
-            try {
-                const response = await fetch(`http://127.0.0.1:8000/api/random?limit=50`);
-                const data = await response.json();
-                if (data.results && data.results.length > 0) {
-                    statusBar.textContent = `✅ Đã tải xong ${data.results.length} khung hình mẫu. Hệ thống sẵn sàng!`;
-                    renderGallery(data.results);
-                }
-            } catch (error) {
-                statusBar.textContent = "❌ Lỗi: Không thể kết nối Backend.";
+        confirmTrakeFrameBtn.addEventListener('click', () => {
+            if (!currentSelectedCardItem) {
+                alert("Vui lòng bấm chọn một khung hình bên trái trước khi xác nhận!");
+                return;
             }
+            if (trakeSelectedFrames.length >= 4) {
+                alert("Bạn đã chọn tối đa 4 khung hình cho TraKE!");
+                return;
+            }
+
+            const { cardElement, frameId } = currentSelectedCardItem;
+            if (trakeSelectedFrames.includes(frameId)) {
+                alert("Khung hình này đã được chọn trước đó, không được chọn trùng lại!");
+                return;
+            }
+
+            trakeSelectedFrames.push(frameId);
+            trakeCount.textContent = trakeSelectedFrames.length;
+            
+            cardElement.classList.remove('selected');
+            cardElement.classList.add('trake-locked');
+            currentSelectedCardItem = null;
+
+            statusBar.textContent = `⏱️ TraKE đã chốt: [${trakeSelectedFrames.join(', ')}]`;
+        });
+
+        backTrakeFrameBtn.addEventListener('click', () => {
+            if (trakeSelectedFrames.length === 0) {
+                alert("Chưa có khung hình nào được xác nhận để Back!");
+                return;
+            }
+
+            trakeSelectedFrames.pop();
+            trakeCount.textContent = trakeSelectedFrames.length;
+
+            document.querySelectorAll('.image-card').forEach(card => {
+                card.classList.remove('trake-locked');
+            });
+
+            statusBar.textContent = `⏱️ Đã hủy frame cuối. TraKE hiện tại: [${trakeSelectedFrames.join(', ')}]`;
+        });
+
+        async function loadRandomKeyframes() {
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/random?limit=50`);
+                const data = await res.json();
+                if (data.results) renderGallery(data.results);
+            } catch (e) {}
         }
 
-        // Tìm kiếm chung cho các tab đơn
         async function performSearch() {
             const prompt = queryInput.value.trim();
             if (!prompt) return;
-            statusBar.textContent = `⏳ Đang truy vấn dữ liệu (${currentMode.toUpperCase()})...`;
             try {
-                const response = await fetch(`http://127.0.0.1:8000/api/search?prompt=${encodeURIComponent(prompt)}&top_k=50`);
-                const data = await response.json();
-                if (!data.results || data.results.length === 0) {
-                    statusBar.textContent = "❌ Không tìm thấy kết quả nào khớp.";
-                    return;
+                let endpoint = 'search';
+                if (primaryMode === 'asr') {
+                    endpoint = 'search-asr';
+                } else if (primaryMode === 'semantic+ocr') {
+                    endpoint = 'search/semantic+ocr';
+                } else if (primaryMode === 'semantic+asr') {
+                    endpoint = 'search/semantic+asr';
                 }
-                statusBar.textContent = `✅ Tìm thấy ${data.results.length} kết quả.`;
-                renderGallery(data.results);
-            } catch (error) {
-                statusBar.textContent = "❌ Lỗi kết nối API Server.";
+
+                const res = await fetch(`http://127.0.0.1:8000/api/${endpoint}?prompt=${encodeURIComponent(prompt)}&top_k=50`);
+                const data = await res.json();
+                if (data.results) renderGallery(data.results);
+            } catch (e) {
+                alert("❌ Lỗi kết nối tới Server.");
             }
         }
 
-        // Tìm kiếm text trong OCR
         async function performOcrTextSearch() {
-            const text = ocrTextInput.value.trim();
-            if (!text) return;
-            statusBar.textContent = "🔤 Đang tìm kiếm văn bản OCR...";
-            try {
-                const response = await fetch(`http://127.0.0.1:8000/api/search?prompt=${encodeURIComponent(text)}&top_k=50`);
-                const data = await response.json();
-                if (!data.results || data.results.length === 0) {
-                    statusBar.textContent = "❌ Không tìm thấy văn bản OCR phù hợp.";
-                    return;
-                }
-                statusBar.textContent = `✅ Tìm thấy ${data.results.length} kết quả OCR.`;
-                renderGallery(data.results);
-            } catch (error) {
-                statusBar.textContent = "❌ Lỗi kết nối API OCR.";
-            }
-        }
-
-        // Tìm kiếm ảnh tương đồng (Image-to-Image) cho OCR
-        async function performOcrImageSearch() {
-            if (!selectedOcrFile) {
-                alert("Vui lòng kéo thả hoặc chọn một file ảnh trước!");
+            const textQuery = ocrTextInput.value.trim();
+            if (!textQuery) {
+                alert("Vui lòng nhập văn bản OCR cần tìm!");
                 return;
             }
-            statusBar.textContent = "🔄 Đang tải ảnh lên và tìm kiếm ảnh tương đồng...";
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/search/ocr?prompt=${encodeURIComponent(textQuery)}&top_k=50`);
+                const data = await res.json();
+                if (data.results) {
+                    renderGallery(data.results);
+                } else {
+                    alert("Không tìm thấy kết quả phù hợp.");
+                }
+            } catch (err) {
+                alert("❌ Không thể kết nối tới Server khi tìm OCR text.");
+            }
+        }
+
+        searchOcrTextBtn.addEventListener('click', performOcrTextSearch);
+        ocrTextInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performOcrTextSearch();
+        });
+
+        async function performOcrImageSearch() {
+            if (!selectedOcrFile) {
+                alert("Vui lòng chọn hoặc kéo thả một hình ảnh để tìm kiếm!");
+                return;
+            }
             
             const formData = new FormData();
             formData.append("file", selectedOcrFile);
 
             try {
-                const response = await fetch(`http://127.0.0.1:8000/api/search?prompt=image_query&top_k=50`, {
+                statusBar.textContent = "⏳ Đang tải ảnh lên và tìm kiếm...";
+                const res = await fetch(`http://127.0.0.1:8000/api/search/image`, {
                     method: 'POST',
                     body: formData
                 });
-                const data = await response.json();
-                if (!data.results || data.results.length === 0) {
-                    statusBar.textContent = "❌ Không tìm thấy ảnh tương đồng phù hợp.";
-                    return;
+                const data = await res.json();
+                if (data.results) {
+                    renderGallery(data.results);
+                    statusBar.textContent = `🚀 Tìm kiếm ảnh hoàn tất (${data.results.length} kết quả)`;
+                } else {
+                    alert("Không tìm thấy ảnh tương đồng.");
                 }
-                statusBar.textContent = `✅ Tìm thấy ${data.results.length} ảnh tương đồng.`;
-                renderGallery(data.results);
-            } catch (error) {
-                statusBar.textContent = "❌ Lỗi kết nối API Image-to-Image.";
+            } catch (err) {
+                alert("❌ Lỗi kết nối khi gửi ảnh tìm kiếm.");
+                statusBar.textContent = "❌ Lỗi tìm kiếm ảnh.";
             }
         }
 
-        // Tìm kiếm TraKE với đúng 4 ô cố định
+        searchOcrImgBtn.addEventListener('click', performOcrImageSearch);
+
         async function performTrakeSearch() {
-            const queries = trakeInputs.map(input => input.value.trim());
-            if (queries.every(q => q === "")) {
-                alert("Vui lòng nhập ít nhất một khoảng khắc sự kiện!");
+            const t1 = document.getElementById('trakeInput1').value.trim();
+            const t2 = document.getElementById('trakeInput2').value.trim();
+            const t3 = document.getElementById('trakeInput3').value.trim();
+            const t4 = document.getElementById('trakeInput4').value.trim();
+
+            if (!t1 && !t2 && !t3 && !t4) {
+                alert("Vui lòng nhập ít nhất một sự kiện cho chuỗi TraKE!");
                 return;
             }
 
-            statusBar.textContent = "⏱️ Đang xử lý truy vấn chuỗi khoảnh khắc TraKE...";
             try {
-                const response = await fetch(`http://127.0.0.1:8000/api/trake?q1=${encodeURIComponent(queries[0])}&q2=${encodeURIComponent(queries[1])}&q3=${encodeURIComponent(queries[2])}&q4=${encodeURIComponent(queries[3])}`);
-                const data = await response.json();
-
-                if (!data.results || data.results.length === 0) {
-                    statusBar.textContent = "❌ Không tìm thấy chuỗi sự kiện TraKE phù hợp.";
-                    return;
+                statusBar.textContent = "⏳ Đang xử lý chuỗi truy vấn TraKE...";
+                const res = await fetch(`http://127.0.0.1:8000/api/search/trake`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trek1: t1, trek2: t2, trek3: t3, trek4: t4, trek5: "" })
+                });
+                const data = await res.json();
+                if (data.results) {
+                    // QUAN TRỌNG: KHÔNG sắp xếp lại ở đây!
+                    // Backend đã trả về đúng thứ tự: mỗi chuỗi 4 ảnh theo đúng
+                    // E1 -> E2 -> E3 -> E4 (frame_id/thời gian tăng dần), và các
+                    // chuỗi đã được xếp theo tổng điểm (total_score) giảm dần.
+                    // Nếu sort lại theo score của TỪNG ảnh riêng lẻ sẽ làm xáo
+                    // trộn thứ tự E1-E4 trong mỗi hàng 4 ảnh.
+                    renderGallery(data.results);
+                    statusBar.textContent = `🚀 TraKE: Tìm thấy ${data.results.length} kết quả (Hiển thị theo hàng 4 frames)`;
+                } else {
+                    alert("Không tìm thấy kết quả TraKE phù hợp.");
                 }
-                statusBar.textContent = `✅ Tìm thấy ${data.results.length} kết quả chuỗi TraKE thỏa mãn.`;
-                renderGallery(data.results);
-            } catch (error) {
-                statusBar.textContent = "❌ Lỗi kết nối API Server TraKE.";
+            } catch (err) {
+                alert("❌ Lỗi kết nối tới Server TraKE.");
+                statusBar.textContent = "❌ Lỗi tìm kiếm TraKE.";
             }
         }
 
-        searchBtn.addEventListener('click', performSearch);
-        queryInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
-        
-        searchOcrTextBtn.addEventListener('click', performOcrTextSearch);
-        ocrTextInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performOcrTextSearch(); });
-        searchOcrImgBtn.addEventListener('click', performOcrImageSearch);
-
         searchTrakeBtn.addEventListener('click', performTrakeSearch);
-        trakeInputs.forEach(input => {
-            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') performTrakeSearch(); });
+
+        document.getElementById('saveCsvBtn').addEventListener('click', async () => {
+            const filenameInput = document.getElementById('csvFilenameInput').value.trim();
+            const metaPathText = document.getElementById('metaPath').textContent.trim();
+            const vqaVal = vqaInputVal.value.trim();
+
+            if (!filenameInput) {
+                alert("Vui lòng nhập tên file CSV!");
+                return;
+            }
+            if (!metaPathText || metaPathText === "---") {
+                alert("Vui lòng chọn ít nhất một Keyframe bên trái!");
+                return;
+            }
+
+            const videoName = metaPathText.split('/')[0];
+            let frameIdParam = "";
+            let activeMode = primaryMode;
+
+            if (isVqaCombined && primaryMode !== 'trake') {
+                activeMode = 'vqa';
+            }
+
+            if (activeMode === 'trake') {
+                if (trakeSelectedFrames.length === 0) {
+                    alert("Vui lòng bấm chọn và Xác nhận các frame bên trái trước khi lưu TraKE!");
+                    return;
+                }
+                frameIdParam = trakeSelectedFrames.join(",");
+            } else {
+                frameIdParam = document.getElementById('metaFrameId').textContent.replace("#", "").trim();
+            }
+
+            try {
+                const url = `http://127.0.0.1:8000/api/submit-csv?mode=${activeMode}&video_name=${encodeURIComponent(videoName)}&frame_id=${encodeURIComponent(frameIdParam)}&filename=${encodeURIComponent(filenameInput)}&vqa_answer=${encodeURIComponent(vqaVal)}`;
+                const res = await fetch(url, { method: 'POST' });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    alert(`✅ Lưu thành công vào file ${filenameInput}.csv (Mode: ${activeMode.toUpperCase()})!`);
+                    if (activeMode === 'trake') {
+                        trakeSelectedFrames = [];
+                        trakeCount.textContent = '0';
+                        document.querySelectorAll('.image-card').forEach(c => c.classList.remove('trake-locked'));
+                    }
+                } else {
+                    alert(`❌ Lỗi: ${data.message}`);
+                }
+            } catch (err) {
+                alert("❌ Không thể kết nối tới Server.");
+            }
         });
 
+        searchBtn.addEventListener('click', performSearch);
+        queryInput.addEventListener('keypress', (e) => { 
+            if (e.key === 'Enter') performSearch(); 
+        });
         window.addEventListener('DOMContentLoaded', loadRandomKeyframes);
     </script>
 </body>
