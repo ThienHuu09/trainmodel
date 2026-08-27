@@ -1,5 +1,6 @@
 import os
 import csv
+import time
 import traceback
 import torch
 import open_clip
@@ -22,7 +23,7 @@ device = "cpu"
 print(f"[INFO] Hệ thống đang chạy hoàn toàn trên thiết bị: {device.upper()}")
 
 # Cấu hình Gemini API Key của bạn tại đây
-GEMINI_API_KEY = ""
+GEMINI_API_KEY = "AQ.Ab8RN6JtY-EGSIMresVONNUBhTpNPLeDjK0lgfivTaUSg8mmVw"
 GEMINI_MODEL_NAME = "gemini-2.5-flash"
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -30,17 +31,17 @@ if GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE" or not GEMINI_API_KEY.strip():
     print("⚠️  [CẢNH BÁO] Bạn chưa thay GEMINI_API_KEY bằng key thật! "
           "Mọi query sẽ KHÔNG được dịch/tối ưu và sẽ rơi vào fallback (dùng nguyên câu gốc).")
 
-# Định nghĩa các Collection riêng biệt trong Qdrant
-IMAGE_COLLECTION_NAME = "jinaV2_images"
+# Định nghĩa các Collection (Chỉ nạp dfn5b_images và trake_collection vào RAM theo yêu cầu)
+IMAGE_COLLECTION_NAME = "dfn5b_images"
 ASR_COLLECTION_NAME = "bge-m3audio"
 OCR_COLLECTION_NAME = "ocr_collection"
 TRAKE_COLLECTION_NAME = "trake_collection"
 
 # Đường dẫn thư mục chứa ảnh keyframe gốc và thư mục chứa video trên máy bạn
 BASE_IMAGE_DIR = r"C:\AIC2026\dataset_webp" 
-VIDEO_DIR = r"C:\AIC2026\video"                 
+VIDEO_DIR = r"C:\AIC2026\video"              
 
-app = FastAPI(title="MFusion-VR Full Core API (Semantic + ASR + OCR + TraKE)")
+app = FastAPI(title="MFusion-VR Core API (DFN5B & TraKE on RAM)")
 
 # Kích hoạt CORS để Frontend kết nối không bị chặn
 app.add_middleware(
@@ -52,8 +53,86 @@ app.add_middleware(
 )
 
 print("⏳ Đang kết nối Qdrant Server...")
-qdrant_client = QdrantClient(host="localhost", port=6333)
+# Tăng timeout lên 60.0 giây để tránh lỗi ReadTimeout khi load dữ liệu lớn
+qdrant_client = QdrantClient(host="localhost", port=6333, timeout=60.0)
 print("✅ Đã kết nối Qdrant thành công!")
+
+
+# ==========================================
+# ⚡ HÀM NẠP COLLECTION VÀO RAM (Đã tối ưu batch & timeout)
+# ==========================================
+def load_collection_to_ram(collection_name: str):
+    print(f"⏳ Đang tải collection '{collection_name}' vào RAM...")
+    t0 = time.time()
+
+    if not qdrant_client.collection_exists(collection_name=collection_name):
+        print(f"[WARN] Collection '{collection_name}' không tồn tại, bỏ qua.")
+        return np.zeros((0, 0), dtype=np.float32), []
+
+    vector_batches = []
+    payloads = []
+    next_offset = None
+    loaded = 0
+
+    while True:
+        try:
+            # Giảm limit xuống 1000 để gói dữ liệu nhẹ hơn, tránh nghẽn mạng và timeout
+            points, next_offset = qdrant_client.scroll(
+                collection_name=collection_name,
+                limit=1000,
+                offset=next_offset,
+                with_payload=True,
+                with_vectors=True,
+            )
+        except Exception as e:
+            print(f"[ERROR] Lỗi khi scroll collection '{collection_name}' tại offset {next_offset}: {e}")
+            break
+
+        if not points:
+            break
+
+        batch_matrix = np.asarray([p.vector for p in points], dtype=np.float32)
+        vector_batches.append(batch_matrix)
+        for p in points:
+            payloads.append(p.payload or {})
+
+        loaded += len(points)
+        print(f"   Đã tải {loaded} điểm của '{collection_name}'...", end="\r")
+
+        if next_offset is None:
+            break
+
+    print() # Xuống dòng sau khi load xong batch
+    if not vector_batches:
+        print(f"[WARN] Collection '{collection_name}' rỗng.")
+        return np.zeros((0, 0), dtype=np.float32), []
+
+    matrix = np.concatenate(vector_batches, axis=0)
+    del vector_batches  
+
+    ram_mb = matrix.nbytes / (1024 ** 2)
+    print(f"✅ '{collection_name}': {matrix.shape[0]} điểm, {matrix.shape[1]} chiều, "
+          f"{ram_mb:.1f} MB, tải trong {time.time() - t0:.1f}s")
+    return matrix, payloads
+
+
+def top_k_indices(sims: np.ndarray, k: int):
+    n = len(sims)
+    k = min(k, n)
+    if k <= 0:
+        return np.array([], dtype=np.int64)
+    idx = np.argpartition(-sims, k - 1)[:k]
+    return idx[np.argsort(-sims[idx])]
+
+
+print("⏳ Đang nạp 2 collection (dfn5b_images & trake_collection) vào RAM...")
+SEMANTIC_MATRIX, SEMANTIC_PAYLOADS = load_collection_to_ram(IMAGE_COLLECTION_NAME)
+TRAKE_MATRIX, TRAKE_PAYLOADS = load_collection_to_ram(TRAKE_COLLECTION_NAME)
+
+_total_ram_mb = sum(
+    m.nbytes / (1024 ** 2) for m in [SEMANTIC_MATRIX, TRAKE_MATRIX]
+)
+print(f"🚀 Đã nạp xong vào RAM (~{_total_ram_mb:.0f} MB). Các API Semantic và TraKE chạy trực tiếp trên RAM tốc độ cao.")
 
 # ==========================================
 # 1. KHỞI TẠO MÔ HÌNH SEMANTIC (OpenCLIP DFN5B - CPU)
@@ -65,12 +144,12 @@ clip_model.eval()
 print("✅ OpenCLIP đã sẵn sàng trên CPU!")
 
 # ==========================================
-# 2. KHỞI TẠO MÔ HÌNH ASR & OCR (Embedding Gemma - CPU)
+# 2. KHỞI TẠO MÔ HÌNH ASR & OCR (EmbeddingGemma 300M - CPU)
 # ==========================================
-print("⏳ Đang tải mô hình Embedding Gemma lên CPU...")
-GEMMA_EMBEDDING_MODEL_NAME = "google/embedding-gemma"  
+print("⏳ Đang tải mô hình EmbeddingGemma (300M) lên CPU...")
+GEMMA_EMBEDDING_MODEL_NAME = "google/embeddinggemma-300m"  
 bge_model = SentenceTransformer(GEMMA_EMBEDDING_MODEL_NAME, device=device)
-print("✅ Embedding Gemma đã sẵn sàng trên CPU!")
+print("✅ EmbeddingGemma đã sẵn sàng trên CPU!")
 
 # Khởi tạo riêng mô hình OpenCLIP ViT-B-32 cho TraKE (CPU)
 print("⏳ Đang tải mô hình OpenCLIP (ViT-B-32) cho TraKE lên CPU...")
@@ -122,10 +201,7 @@ def optimize_query_for_clip(raw_query: str) -> str:
 @app.get("/api/search")
 def search_semantic(prompt: str = Query(..., description="Query Text cho Image"), top_k: int = 50):
     """
-    [NHIỆM VỤ]: Semantic Text-to-Image Search.
-    - Nhận câu truy vấn văn bản (tiếng Việt hoặc tiếng Anh).
-    - Sử dụng Gemini để dịch và tối ưu hóa câu lệnh sang tiếng Anh chuẩn OpenCLIP.
-    - Chuyển văn bản thành vector đặc trưng và tìm kiếm các keyframe tương đồng cao nhất trên Qdrant.
+    [NHIỆM VỤ]: Semantic Text-to-Image Search (Chạy trực tiếp trên RAM với dfn5b).
     """
     if not prompt.strip():
         return {"results": []}
@@ -135,21 +211,23 @@ def search_semantic(prompt: str = Query(..., description="Query Text cho Image")
         with torch.no_grad():
             query_features = clip_model.encode_text(text_tokens)
             query_features /= query_features.norm(dim=-1, keepdim=True)
-            query_embedding = query_features.numpy().flatten().tolist()
-            
-        search_result = qdrant_client.search(
-            collection_name=IMAGE_COLLECTION_NAME, query_vector=query_embedding, limit=top_k
-        )
-        
+            query_embedding = query_features.numpy().flatten().astype(np.float32)
+
+        if SEMANTIC_MATRIX.shape[0] == 0:
+            return {"results": [], "error": f"Collection '{IMAGE_COLLECTION_NAME}' rỗng hoặc chưa nạp."}
+
+        sims = SEMANTIC_MATRIX @ query_embedding  
+        top_idx = top_k_indices(sims, top_k)
+
         output = []
-        for hit in search_result:
-            payload = hit.payload
+        for i in top_idx:
+            p = SEMANTIC_PAYLOADS[i]
             output.append({
-                "image_path": payload.get("image_path"),
-                "score": round(hit.score, 4),
-                "video_name": payload.get("video_name"),
-                "frame_id": payload.get("frame_id"),
-                "pts_time": payload.get("pts_time", 0.0)
+                "image_path": p.get("image_path"),
+                "score": round(float(sims[i]), 4),
+                "video_name": p.get("video_name"),
+                "frame_id": p.get("frame_id"),
+                "pts_time": p.get("pts_time", 0.0)
             })
         return {"results": output}
     except Exception as e:
@@ -159,10 +237,7 @@ def search_semantic(prompt: str = Query(..., description="Query Text cho Image")
 @app.post("/api/search/image")
 async def search_image_by_upload(file: UploadFile = File(...), top_k: int = 50):
     """
-    [NHIỆM VỤ]: Image-to-Image Search.
-    - Nhận một file hình ảnh được tải lên từ phía người dùng.
-    - Trích xuất vector đặc trưng hình ảnh bằng OpenCLIP.
-    - Truy vấn các khung hình video có nội dung hoặc bối cảnh trực quan tương tự.
+    [NHIỆM VỤ]: Image-to-Image Search (Chạy trực tiếp trên RAM với dfn5b).
     """
     try:
         image_bytes = await file.read()
@@ -173,21 +248,23 @@ async def search_image_by_upload(file: UploadFile = File(...), top_k: int = 50):
         with torch.no_grad():
             image_features = clip_model.encode_image(image_tensor)
             image_features /= image_features.norm(dim=-1, keepdim=True)
-            query_embedding = image_features.numpy().flatten().tolist()
-            
-        search_result = qdrant_client.search(
-            collection_name=IMAGE_COLLECTION_NAME, query_vector=query_embedding, limit=top_k
-        )
-        
+            query_embedding = image_features.numpy().flatten().astype(np.float32)
+
+        if SEMANTIC_MATRIX.shape[0] == 0:
+            return {"results": [], "error": f"Collection '{IMAGE_COLLECTION_NAME}' rỗng hoặc chưa nạp."}
+
+        sims = SEMANTIC_MATRIX @ query_embedding
+        top_idx = top_k_indices(sims, top_k)
+
         output = []
-        for hit in search_result:
-            payload = hit.payload
+        for i in top_idx:
+            p = SEMANTIC_PAYLOADS[i]
             output.append({
-                "image_path": payload.get("image_path"),
-                "score": round(hit.score, 4),
-                "video_name": payload.get("video_name"),
-                "frame_id": payload.get("frame_id"),
-                "pts_time": payload.get("pts_time", 0.0)
+                "image_path": p.get("image_path"),
+                "score": round(float(sims[i]), 4),
+                "video_name": p.get("video_name"),
+                "frame_id": p.get("frame_id"),
+                "pts_time": p.get("pts_time", 0.0)
             })
         return {"results": output}
     except Exception as e:
@@ -197,9 +274,7 @@ async def search_image_by_upload(file: UploadFile = File(...), top_k: int = 50):
 @app.get("/api/search-asr")
 def search_asr(prompt: str = Query(..., description="Query Text cho ASR"), top_k: int = 50):
     """
-    [NHIỆM VỤ]: ASR (Speech-to-Text) Search.
-    - Nhận từ khóa hoặc nội dung câu nói cần tìm kiếm.
-    - Sử dụng mô hình Embedding Gemma để chuyển câu query thành vector và tìm kiếm trong cơ sở dữ liệu lời thoại video.
+    [NHIỆM VỤ]: ASR (Speech-to-Text) Search (Truy vấn trực tiếp Qdrant do không nạp RAM).
     """
     if not prompt.strip():
         return {"results": []}
@@ -231,9 +306,7 @@ def search_asr(prompt: str = Query(..., description="Query Text cho ASR"), top_k
 @app.get("/api/search/ocr")
 def search_ocr_text(prompt: str = Query(..., description="Query Text cho OCR"), top_k: int = 50):
     """
-    [NHIỆM VỤ]: OCR (Text-in-Video) Search.
-    - Tìm kiếm các đoạn văn bản xuất hiện trực tiếp bên trong khung hình video (bảng hiệu, chữ viết, phụ đề).
-    - Hỗ trợ tìm kiếm khớp chuỗi trực tiếp (Text Match) và kết hợp tìm kiếm ngữ nghĩa qua vector khi cần thiết.
+    [NHIỆM VỤ]: OCR (Text-in-Video) Search (Truy vấn trực tiếp Qdrant do không nạp RAM).
     """
     if not prompt.strip():
         return {"results": []}
@@ -290,10 +363,7 @@ class TrakeRequest(BaseModel):
 @app.post("/api/search/trake")
 def search_trake(req: TrakeRequest):
     """
-    [NHIỆM VỤ]: TraKE (Sequential Action Search).
-    - Nhận danh sách các bước hành động tuần tự theo thời gian (từ Trek 1 đến Trek 5).
-    - Kết hợp các bước thành một chuỗi ngữ cảnh hành động duy nhất và mã hóa qua OpenCLIP ViT-B-32.
-    - Truy tìm các đoạn video chứa chuỗi hành động diễn ra liên tiếp đúng thứ tự yêu cầu.
+    [NHIỆM VỤ]: TraKE (Sequential Action Search - Chạy trực tiếp trên RAM).
     """
     try:
         queries = [req.trek1, req.trek2, req.trek3, req.trek4, req.trek5]
@@ -308,25 +378,25 @@ def search_trake(req: TrakeRequest):
         with torch.no_grad():
             feat = trake_model.encode_text(text_tokens)
             feat /= feat.norm(dim=-1, keepdim=True)
-            emb = feat.numpy().flatten().tolist()
-                
-        res = qdrant_client.search(
-            collection_name=TRAKE_COLLECTION_NAME, 
-            query_vector=emb, 
-            limit=50
-        )
-        
+            emb = feat.numpy().flatten().astype(np.float32)
+
+        if TRAKE_MATRIX.shape[0] == 0:
+            return {"results": [], "error": f"Collection '{TRAKE_COLLECTION_NAME}' rỗng hoặc chưa nạp."}
+
+        sims = TRAKE_MATRIX @ emb
+        top_idx = top_k_indices(sims, 50)
+
         output = []
-        for hit in res:
-            p = hit.payload
+        for i in top_idx:
+            p = TRAKE_PAYLOADS[i]
             output.append({
                 "image_path": p.get("image_path"),
-                "score": round(hit.score, 4),
+                "score": round(float(sims[i]), 4),
                 "video_name": p.get("video_name"),
                 "frame_id": p.get("frame_id"),
                 "pts_time": p.get("pts_time", 0.0)
             })
-            
+
         sorted_output = sorted(output, key=lambda x: x.get('score', 0), reverse=True)
         return {"results": sorted_output}
     except Exception as e:
@@ -336,27 +406,25 @@ def search_trake(req: TrakeRequest):
 @app.get("/api/random")
 def get_random_keyframes(limit: int = 50):
     """
-    [NHIỆM VỤ]: Random Exploration.
-    - Tạo một vector ngẫu nhiên chuẩn hóa và truy vấn Qdrant để trả về danh sách các keyframe ngẫu nhiên.
-    - Phục vụ mục đích khám phá tập dữ liệu nhanh hoặc kiểm tra giao diện.
+    [NHIỆM VỤ]: Random Exploration (Lấy ngẫu nhiên từ RAM của dfn5b).
     """
     try:
-        random_vector = np.random.uniform(-1, 1, 1024).astype(np.float32)
-        random_vector /= np.linalg.norm(random_vector)
-        
-        search_result = qdrant_client.search(
-            collection_name=IMAGE_COLLECTION_NAME, query_vector=random_vector.tolist(), limit=limit
-        )
-        
+        n = len(SEMANTIC_PAYLOADS)
+        if n == 0:
+            return {"results": [], "error": f"Collection '{IMAGE_COLLECTION_NAME}' rỗng hoặc chưa nạp."}
+
+        k = min(limit, n)
+        random_idx = np.random.choice(n, size=k, replace=False)
+
         output = []
-        for hit in search_result:
-            payload = hit.payload
+        for i in random_idx:
+            p = SEMANTIC_PAYLOADS[i]
             output.append({
-                "image_path": payload.get("image_path"),
+                "image_path": p.get("image_path"),
                 "score": "RAND",
-                "video_name": payload.get("video_name"),
-                "frame_id": payload.get("frame_id"),
-                "pts_time": payload.get("pts_time", 0.0)
+                "video_name": p.get("video_name"),
+                "frame_id": p.get("frame_id"),
+                "pts_time": p.get("pts_time", 0.0)
             })
         return {"results": output}
     except Exception as e:
@@ -367,7 +435,6 @@ def get_random_keyframes(limit: int = 50):
 def get_local_image(path: str):
     """
     [NHIỆM VỤ]: Image File Server.
-    - Trả về tệp hình ảnh keyframe thực tế lưu trữ trên ổ cứng dựa theo đường dẫn truyền vào.
     """
     if not os.path.isabs(path):
         win_path = os.path.join(BASE_IMAGE_DIR, path)
@@ -383,7 +450,6 @@ def get_local_image(path: str):
 def get_local_video(video_name: str):
     """
     [NHIỆM VỤ]: Video Streaming / File Server.
-    - Trả về tệp video gốc tương ứng với tên video để xem lại phân cảnh.
     """
     filename = f"{video_name}.mp4" if not video_name.endswith(".mp4") else video_name
     video_path = os.path.join(VIDEO_DIR, filename)
@@ -403,8 +469,6 @@ def submit_to_csv(
 ):
     """
     [NHIỆM VỤ]: Competition Submission Helper.
-    - Tự động đóng gói kết quả tìm kiếm (tên video, mã frame hoặc câu trả lời VQA).
-    - Ghi định dạng chuẩn vào file `.csv` để chuẩn bị nộp bài cho các vòng đấu.
     """
     try:
         output_dir = r"C:\Users\XPS 15 9570\Downloads\submission"
