@@ -1,5 +1,6 @@
 import os
 import csv
+import traceback
 import torch
 import open_clip
 import numpy as np
@@ -12,10 +13,23 @@ from qdrant_client.http import models as qmodels
 from sentence_transformers import SentenceTransformer
 from pydantic import BaseModel
 from PIL import Image
+from google import genai
 
-# Tự động chọn GPU nếu có, nếu không sẽ tự fallback về CPU
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"[INFO] Đang sử dụng thiết bị: {device}")
+# ==========================================
+# CẤU HÌNH THIẾT BỊ VÀ GEMINI API (Full CPU)
+# ==========================================
+device = "cpu"
+print(f"[INFO] Hệ thống đang chạy hoàn toàn trên thiết bị: {device.upper()}")
+
+# Cấu hình Gemini API Key của bạn tại đây (dán trực tiếp key thật vào chuỗi bên dưới)
+GEMINI_API_KEY = ""
+GEMINI_MODEL_NAME = "gemini-2.5-flash"
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+
+if GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE" or not GEMINI_API_KEY.strip():
+    print("⚠️  [CẢNH BÁO] Bạn chưa thay GEMINI_API_KEY bằng key thật! "
+          "Mọi query sẽ KHÔNG được dịch/tối ưu và sẽ rơi vào fallback (dùng nguyên câu gốc) -> "
+          "query tiếng Việt sẽ cho kết quả sai vì CLIP không hiểu tiếng Việt.")
 
 # Định nghĩa các Collection riêng biệt
 IMAGE_COLLECTION_NAME = "jinaV2_images"
@@ -43,44 +57,93 @@ qdrant_client = QdrantClient(host="localhost", port=6333)
 print("✅ Đã kết nối Qdrant thành công!")
 
 # ==========================================
-# 1. KHỞI TẠO MÔ HÌNH SEMANTIC & TraKE (OpenCLIP)
+# 1. KHỞI TẠO MÔ HÌNH SEMANTIC (OpenCLIP DFN5B - CPU)
 # ==========================================
-print("⏳ Đang tải mô hình OpenCLIP (DFN5B) lên thiết bị...")
+print("⏳ Đang tải mô hình OpenCLIP (DFN5B) lên CPU...")
 clip_model, _, clip_preprocess = open_clip.create_model_and_transforms('ViT-H-14-quickgelu', pretrained='dfn5b', device=device)
 clip_tokenizer = open_clip.get_tokenizer('ViT-H-14-quickgelu')
 clip_model.eval()
-print("✅ OpenCLIP đã sẵn sàng!")
+print("✅ OpenCLIP đã sẵn sàng trên CPU!")
 
 # ==========================================
-# 2. KHỞI TẠO MÔ HÌNH ASR & OCR (BGE-M3)
+# 2. KHỞI TẠO MÔ HÌNH ASR & OCR (BGE-M3 - CPU)
 # ==========================================
-print("⏳ Đang tải mô hình BGE-M3 lên thiết bị...")
+print("⏳ Đang tải mô hình BGE-M3 lên CPU...")
 bge_model = SentenceTransformer('BAAI/bge-m3', device=device)
-print("✅ BGE-M3 đã sẵn sàng!")
+print("✅ BGE-M3 đã sẵn sàng trên CPU!")
 
-# Khởi tạo riêng mô hình OpenCLIP ViT-B-32 cho TraKE
-print("⏳ Đang tải mô hình OpenCLIP (ViT-B-32) cho TraKE lên thiết bị...")
+# Khởi tạo riêng mô hình OpenCLIP ViT-B-32 cho TraKE (CPU)
+print("⏳ Đang tải mô hình OpenCLIP (ViT-B-32) cho TraKE lên CPU...")
 trake_model, _, trake_preprocess = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k", device=device)
 trake_tokenizer = open_clip.get_tokenizer("ViT-B-32")
 trake_model.eval()
-print("✅ OpenCLIP ViT-B-32 cho TraKE đã sẵn sàng (512 chiều)!")
+print("✅ OpenCLIP ViT-B-32 cho TraKE đã sẵn sàng trên CPU!")
+
+# ==========================================
+# HÀM HỖ TRỢ: DỊCH, TÓM TẮT & TỐI ƯU QUERY BẰNG GEMINI
+# ==========================================
+def optimize_query_for_clip(raw_query: str) -> str:
+    """
+    - Nếu query là tiếng Việt: Dịch sang tiếng Anh, tóm tắt và giữ lại đặc trưng.
+    - Nếu query đã là tiếng Anh: Giữ nguyên ngôn ngữ, tóm tắt và giữ lại đặc trưng.
+    - Đảm bảo độ dài chuẩn dưới 77 tokens cho OpenCLIP.
+    """
+    if not raw_query or not raw_query.strip():
+        return ""
+        
+    prompt_instruction = f"""
+    Bạn là một chuyên gia tối ưu hóa và dịch thuật câu lệnh tìm kiếm hình ảnh/video cho mô hình OpenCLIP.
+    Nhiệm vụ: 
+    1. Kiểm tra ngôn ngữ của câu query gốc dưới đây.
+    2. Nếu câu query là tiếng Việt, hãy **dịch sang tiếng Anh** chuẩn xác. Nếu câu query đã là tiếng Anh, hãy giữ nguyên tiếng Anh.
+    3. Tóm tắt, cô đọng câu đó lại thành một câu ngắn gọn, súc tích, giữ lại toàn bộ các đặc trưng quan trọng nhất (hành động, bối cảnh, đối tượng, màu sắc, trang phục, văn bản xuất hiện).
+    
+    Yêu cầu bắt buộc:
+    - Kết quả trả về PHẢI LÀ TIẾNG ANH.
+    - Độ dài tối đa khoảng 40-60 từ (đảm bảo dưới giới hạn 77 tokens của CLIP).
+    - Chỉ trả về duy nhất chuỗi query đã hoàn thiện, tuyệt đối không kèm theo lời giải thích, không có dấu ngoặc kép hay tiền tố thừa.
+    
+    Query gốc: "{raw_query}"
+    """
+    
+    try:
+        response = gemini_client.models.generate_content(
+            model=GEMINI_MODEL_NAME,
+            contents=prompt_instruction
+        )
+        optimized_text = response.text.strip().replace('"', '')
+
+        # Đếm số token thực tế theo tokenizer của CLIP để xác nhận nằm trong giới hạn 77 token
+        # (clip_tokenizer tự động pad/truncate về context_length=77, đây chỉ là bước log để kiểm tra)
+        token_ids = clip_tokenizer([optimized_text])
+        num_tokens = int((token_ids != 0).sum().item())
+        print(f"[Gemini Translator & Optimizer] Gốc: '{raw_query}'")
+        print(f"[Gemini Translator & Optimizer] -> Kết quả (EN, {num_tokens} tokens): '{optimized_text}'")
+
+        return optimized_text
+    except Exception as e:
+        print(f"[Gemini Error] Không thể xử lý query, dùng tạm query gốc: {e}")
+        traceback.print_exc()
+        return raw_query
 
 # ==========================================
 # 3. CÁC API ENDPOINTS
 # ==========================================
 
-# API 1: Tìm kiếm Semantic Hình ảnh/Keyframe
+# API 1: Tìm kiếm Semantic Hình ảnh/Keyframe (Tích hợp Gemini Translator & Optimizer)
 @app.get("/api/search")
 def search_semantic(prompt: str = Query(..., description="Query Text cho Image"), top_k: int = 50):
     if not prompt.strip():
         return {"results": []}
     try:
-        text_tokens = clip_tokenizer([prompt]).to(device)
+        # Gọi Gemini để dịch (nếu cần) + tóm tắt + giữ đặc trưng
+        refined_prompt = optimize_query_for_clip(prompt)
+        
+        text_tokens = clip_tokenizer([refined_prompt]).to(device)
         with torch.no_grad():
             query_features = clip_model.encode_text(text_tokens)
             query_features /= query_features.norm(dim=-1, keepdim=True)
-            # Chuyển tensor từ GPU về CPU trước khi chuyển sang numpy
-            query_embedding = query_features.cpu().numpy().flatten().tolist()
+            query_embedding = query_features.numpy().flatten().tolist()
             
         search_result = qdrant_client.search(
             collection_name=IMAGE_COLLECTION_NAME, query_vector=query_embedding, limit=top_k
@@ -96,6 +159,10 @@ def search_semantic(prompt: str = Query(..., description="Query Text cho Image")
                 "frame_id": payload.get("frame_id"),
                 "pts_time": payload.get("pts_time", 0.0)
             })
+
+        print(f"[CLIP Search] Query gốc: '{prompt}'")
+        print(f"[CLIP Search] Query đã dịch & tối ưu: '{refined_prompt}' -> {len(output)} kết quả")
+
         return {"results": output}
     except Exception as e:
         return {"results": [], "error": str(e)}
@@ -109,14 +176,12 @@ async def search_image_by_upload(file: UploadFile = File(...), top_k: int = 50):
         import io
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         
-        # Tiền xử lý ảnh và đẩy tensor lên GPU
         image_tensor = clip_preprocess(image).unsqueeze(0).to(device)
         
         with torch.no_grad():
             image_features = clip_model.encode_image(image_tensor)
             image_features /= image_features.norm(dim=-1, keepdim=True)
-            # Chuyển tensor từ GPU về CPU trước khi chuyển sang numpy
-            query_embedding = image_features.cpu().numpy().flatten().tolist()
+            query_embedding = image_features.numpy().flatten().tolist()
             
         search_result = qdrant_client.search(
             collection_name=IMAGE_COLLECTION_NAME, query_vector=query_embedding, limit=top_k
@@ -232,17 +297,14 @@ def search_trake(req: TrakeRequest):
         if not active_queries:
             return {"results": []}
         
-        # Tạo chuỗi kết hợp các sự kiện để truy vấn tìm kiếm tổng thể
         combined_prompt = " -> ".join(active_queries)
         text_tokens = trake_tokenizer([combined_prompt]).to(device)
         
         with torch.no_grad():
             feat = trake_model.encode_text(text_tokens)
             feat /= feat.norm(dim=-1, keepdim=True)
-            # Chuyển tensor từ GPU về CPU trước khi chuyển sang numpy
-            emb = feat.cpu().numpy().flatten().tolist()
+            emb = feat.numpy().flatten().tolist()
                 
-        # Thực hiện tìm kiếm trong collection trake_collection
         res = qdrant_client.search(
             collection_name=TRAKE_COLLECTION_NAME, 
             query_vector=emb, 
@@ -260,9 +322,7 @@ def search_trake(req: TrakeRequest):
                 "pts_time": p.get("pts_time", 0.0)
             })
             
-        # Sắp xếp kết quả theo score giảm dần để khi hiển thị lên lưới 4 cột sẽ khớp chính xác với thứ tự hàng
         sorted_output = sorted(output, key=lambda x: x.get('score', 0), reverse=True)
-
         return {"results": sorted_output}
     except Exception as e:
         return {"results": [], "error": str(e)}
