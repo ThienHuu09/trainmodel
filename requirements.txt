@@ -1,14 +1,11 @@
-fastapi>=0.100.0
-uvicorn>=0.20.0
-torch>=2.0.0
-open-clip-torch>=2.20.0
-sentence-transformers>=2.2.2
-qdrant-client>=1.6.0
-onnxruntime>=1.15.0          # (Hoặc onnxruntime-gpu nếu chạy server có GPU)
-pandas>=1.5.0
-openpyxl>=3.0.10             # Hỗ trợ đọc file .xlsx
-numpy>=1.22.0
-Pillow>=9.0.0
-pydantic>=2.0.0
-python-multipart>=0.0.5
-tqdm>=4.64.0                 # Thêm thanh tiến trình khi xử lý dữ liệu lớn
+torch
+open-clip-torch
+numpy
+fastapi
+uvicorn
+qdrant-client
+sentence-transformers
+pydantic
+Pillow
+google-genai
+tqdm
