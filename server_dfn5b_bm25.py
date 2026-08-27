@@ -21,17 +21,16 @@ from google import genai
 device = "cpu"
 print(f"[INFO] Hệ thống đang chạy hoàn toàn trên thiết bị: {device.upper()}")
 
-# Cấu hình Gemini API Key của bạn tại đây (dán trực tiếp key thật vào chuỗi bên dưới)
+# Cấu hình Gemini API Key của bạn tại đây
 GEMINI_API_KEY = ""
 GEMINI_MODEL_NAME = "gemini-2.5-flash"
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 if GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE" or not GEMINI_API_KEY.strip():
     print("⚠️  [CẢNH BÁO] Bạn chưa thay GEMINI_API_KEY bằng key thật! "
-          "Mọi query sẽ KHÔNG được dịch/tối ưu và sẽ rơi vào fallback (dùng nguyên câu gốc) -> "
-          "query tiếng Việt sẽ cho kết quả sai vì CLIP không hiểu tiếng Việt.")
+          "Mọi query sẽ KHÔNG được dịch/tối ưu và sẽ rơi vào fallback (dùng nguyên câu gốc).")
 
-# Định nghĩa các Collection riêng biệt
+# Định nghĩa các Collection riêng biệt trong Qdrant
 IMAGE_COLLECTION_NAME = "jinaV2_images"
 ASR_COLLECTION_NAME = "bge-m3audio"
 OCR_COLLECTION_NAME = "ocr_collection"
@@ -66,11 +65,12 @@ clip_model.eval()
 print("✅ OpenCLIP đã sẵn sàng trên CPU!")
 
 # ==========================================
-# 2. KHỞI TẠO MÔ HÌNH ASR & OCR (BGE-M3 - CPU)
+# 2. KHỞI TẠO MÔ HÌNH ASR & OCR (Embedding Gemma - CPU)
 # ==========================================
-print("⏳ Đang tải mô hình BGE-M3 lên CPU...")
-bge_model = SentenceTransformer('BAAI/bge-m3', device=device)
-print("✅ BGE-M3 đã sẵn sàng trên CPU!")
+print("⏳ Đang tải mô hình Embedding Gemma lên CPU...")
+GEMMA_EMBEDDING_MODEL_NAME = "google/embedding-gemma"  
+bge_model = SentenceTransformer(GEMMA_EMBEDDING_MODEL_NAME, device=device)
+print("✅ Embedding Gemma đã sẵn sàng trên CPU!")
 
 # Khởi tạo riêng mô hình OpenCLIP ViT-B-32 cho TraKE (CPU)
 print("⏳ Đang tải mô hình OpenCLIP (ViT-B-32) cho TraKE lên CPU...")
@@ -83,11 +83,6 @@ print("✅ OpenCLIP ViT-B-32 cho TraKE đã sẵn sàng trên CPU!")
 # HÀM HỖ TRỢ: DỊCH, TÓM TẮT & TỐI ƯU QUERY BẰNG GEMINI
 # ==========================================
 def optimize_query_for_clip(raw_query: str) -> str:
-    """
-    - Nếu query là tiếng Việt: Dịch sang tiếng Anh, tóm tắt và giữ lại đặc trưng.
-    - Nếu query đã là tiếng Anh: Giữ nguyên ngôn ngữ, tóm tắt và giữ lại đặc trưng.
-    - Đảm bảo độ dài chuẩn dưới 77 tokens cho OpenCLIP.
-    """
     if not raw_query or not raw_query.strip():
         return ""
         
@@ -100,8 +95,8 @@ def optimize_query_for_clip(raw_query: str) -> str:
     
     Yêu cầu bắt buộc:
     - Kết quả trả về PHẢI LÀ TIẾNG ANH.
-    - Độ dài tối đa khoảng 40-60 từ (đảm bảo dưới giới hạn 77 tokens của CLIP).
-    - Chỉ trả về duy nhất chuỗi query đã hoàn thiện, tuyệt đối không kèm theo lời giải thích, không có dấu ngoặc kép hay tiền tố thừa.
+    - Độ dài tối đa khoảng 40-60 từ.
+    - Chỉ trả về duy nhất chuỗi query đã hoàn thiện, tuyệt đối không kèm theo lời giải thích.
     
     Query gốc: "{raw_query}"
     """
@@ -112,33 +107,30 @@ def optimize_query_for_clip(raw_query: str) -> str:
             contents=prompt_instruction
         )
         optimized_text = response.text.strip().replace('"', '')
-
-        # Đếm số token thực tế theo tokenizer của CLIP để xác nhận nằm trong giới hạn 77 token
-        # (clip_tokenizer tự động pad/truncate về context_length=77, đây chỉ là bước log để kiểm tra)
         token_ids = clip_tokenizer([optimized_text])
         num_tokens = int((token_ids != 0).sum().item())
-        print(f"[Gemini Translator & Optimizer] Gốc: '{raw_query}'")
-        print(f"[Gemini Translator & Optimizer] -> Kết quả (EN, {num_tokens} tokens): '{optimized_text}'")
-
+        print(f"[Gemini Translator & Optimizer] Gốc: '{raw_query}' -> Kết quả: '{optimized_text}'")
         return optimized_text
     except Exception as e:
         print(f"[Gemini Error] Không thể xử lý query, dùng tạm query gốc: {e}")
-        traceback.print_exc()
         return raw_query
 
 # ==========================================
-# 3. CÁC API ENDPOINTS
+# 3. CÁC API ENDPOINTS & NHIỆM VỤ CHI TIẾT
 # ==========================================
 
-# API 1: Tìm kiếm Semantic Hình ảnh/Keyframe (Tích hợp Gemini Translator & Optimizer)
 @app.get("/api/search")
 def search_semantic(prompt: str = Query(..., description="Query Text cho Image"), top_k: int = 50):
+    """
+    [NHIỆM VỤ]: Semantic Text-to-Image Search.
+    - Nhận câu truy vấn văn bản (tiếng Việt hoặc tiếng Anh).
+    - Sử dụng Gemini để dịch và tối ưu hóa câu lệnh sang tiếng Anh chuẩn OpenCLIP.
+    - Chuyển văn bản thành vector đặc trưng và tìm kiếm các keyframe tương đồng cao nhất trên Qdrant.
+    """
     if not prompt.strip():
         return {"results": []}
     try:
-        # Gọi Gemini để dịch (nếu cần) + tóm tắt + giữ đặc trưng
         refined_prompt = optimize_query_for_clip(prompt)
-        
         text_tokens = clip_tokenizer([refined_prompt]).to(device)
         with torch.no_grad():
             query_features = clip_model.encode_text(text_tokens)
@@ -159,23 +151,23 @@ def search_semantic(prompt: str = Query(..., description="Query Text cho Image")
                 "frame_id": payload.get("frame_id"),
                 "pts_time": payload.get("pts_time", 0.0)
             })
-
-        print(f"[CLIP Search] Query gốc: '{prompt}'")
-        print(f"[CLIP Search] Query đã dịch & tối ưu: '{refined_prompt}' -> {len(output)} kết quả")
-
         return {"results": output}
     except Exception as e:
         return {"results": [], "error": str(e)}
 
 
-# API bổ sung: Tìm kiếm ảnh tương đồng bằng cách tải file ảnh lên (Image-to-Image Search)
 @app.post("/api/search/image")
 async def search_image_by_upload(file: UploadFile = File(...), top_k: int = 50):
+    """
+    [NHIỆM VỤ]: Image-to-Image Search.
+    - Nhận một file hình ảnh được tải lên từ phía người dùng.
+    - Trích xuất vector đặc trưng hình ảnh bằng OpenCLIP.
+    - Truy vấn các khung hình video có nội dung hoặc bối cảnh trực quan tương tự.
+    """
     try:
         image_bytes = await file.read()
         import io
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        
         image_tensor = clip_preprocess(image).unsqueeze(0).to(device)
         
         with torch.no_grad():
@@ -202,9 +194,13 @@ async def search_image_by_upload(file: UploadFile = File(...), top_k: int = 50):
         return {"results": [], "error": str(e)}
 
 
-# API 2: Tìm kiếm ASR (Lời thoại qua BGE-M3)
 @app.get("/api/search-asr")
 def search_asr(prompt: str = Query(..., description="Query Text cho ASR"), top_k: int = 50):
+    """
+    [NHIỆM VỤ]: ASR (Speech-to-Text) Search.
+    - Nhận từ khóa hoặc nội dung câu nói cần tìm kiếm.
+    - Sử dụng mô hình Embedding Gemma để chuyển câu query thành vector và tìm kiếm trong cơ sở dữ liệu lời thoại video.
+    """
     if not prompt.strip():
         return {"results": []}
     try:
@@ -232,9 +228,13 @@ def search_asr(prompt: str = Query(..., description="Query Text cho ASR"), top_k
         return {"results": [], "error": str(e)}
 
 
-# API 3: Tìm kiếm OCR
 @app.get("/api/search/ocr")
 def search_ocr_text(prompt: str = Query(..., description="Query Text cho OCR"), top_k: int = 50):
+    """
+    [NHIỆM VỤ]: OCR (Text-in-Video) Search.
+    - Tìm kiếm các đoạn văn bản xuất hiện trực tiếp bên trong khung hình video (bảng hiệu, chữ viết, phụ đề).
+    - Hỗ trợ tìm kiếm khớp chuỗi trực tiếp (Text Match) và kết hợp tìm kiếm ngữ nghĩa qua vector khi cần thiết.
+    """
     if not prompt.strip():
         return {"results": []}
     try:
@@ -279,7 +279,6 @@ def search_ocr_text(prompt: str = Query(..., description="Query Text cho OCR"), 
         return {"results": [], "error": str(e)}
 
 
-# API 4: Tìm kiếm TraKE (Temporal/Sequential Search)
 class TrakeRequest(BaseModel):
     trek1: str = ""
     trek2: str = ""
@@ -290,6 +289,12 @@ class TrakeRequest(BaseModel):
 
 @app.post("/api/search/trake")
 def search_trake(req: TrakeRequest):
+    """
+    [NHIỆM VỤ]: TraKE (Sequential Action Search).
+    - Nhận danh sách các bước hành động tuần tự theo thời gian (từ Trek 1 đến Trek 5).
+    - Kết hợp các bước thành một chuỗi ngữ cảnh hành động duy nhất và mã hóa qua OpenCLIP ViT-B-32.
+    - Truy tìm các đoạn video chứa chuỗi hành động diễn ra liên tiếp đúng thứ tự yêu cầu.
+    """
     try:
         queries = [req.trek1, req.trek2, req.trek3, req.trek4, req.trek5]
         active_queries = [q for q in queries if q.strip()]
@@ -328,9 +333,13 @@ def search_trake(req: TrakeRequest):
         return {"results": [], "error": str(e)}
 
 
-# API 5: Lấy danh sách ngẫu nhiên keyframe
 @app.get("/api/random")
 def get_random_keyframes(limit: int = 50):
+    """
+    [NHIỆM VỤ]: Random Exploration.
+    - Tạo một vector ngẫu nhiên chuẩn hóa và truy vấn Qdrant để trả về danh sách các keyframe ngẫu nhiên.
+    - Phục vụ mục đích khám phá tập dữ liệu nhanh hoặc kiểm tra giao diện.
+    """
     try:
         random_vector = np.random.uniform(-1, 1, 1024).astype(np.float32)
         random_vector /= np.linalg.norm(random_vector)
@@ -354,9 +363,12 @@ def get_random_keyframes(limit: int = 50):
         return {"results": [], "error": str(e)}
 
 
-# API 6: Trả về file ảnh tĩnh
 @app.get("/api/image")
 def get_local_image(path: str):
+    """
+    [NHIỆM VỤ]: Image File Server.
+    - Trả về tệp hình ảnh keyframe thực tế lưu trữ trên ổ cứng dựa theo đường dẫn truyền vào.
+    """
     if not os.path.isabs(path):
         win_path = os.path.join(BASE_IMAGE_DIR, path)
     else:
@@ -367,9 +379,12 @@ def get_local_image(path: str):
     return {"error": f"File not found at {win_path}"}
 
 
-# API 7: Trả về file video MP4
 @app.get("/api/video")
 def get_local_video(video_name: str):
+    """
+    [NHIỆM VỤ]: Video Streaming / File Server.
+    - Trả về tệp video gốc tương ứng với tên video để xem lại phân cảnh.
+    """
     filename = f"{video_name}.mp4" if not video_name.endswith(".mp4") else video_name
     video_path = os.path.join(VIDEO_DIR, filename)
     
@@ -378,7 +393,6 @@ def get_local_video(video_name: str):
     return {"error": f"Video not found at {video_path}"}
 
 
-# API 8: Tạo và lưu file CSV Submission
 @app.post("/api/submit-csv")
 def submit_to_csv(
     mode: str = Query("semantic", description="Chế độ hiện tại: semantic, vqa, trake"),
@@ -387,6 +401,11 @@ def submit_to_csv(
     filename: str = Query(..., description="Tên file CSV muốn lưu"),
     vqa_answer: str = Query("", description="Đáp án VQA nếu có")
 ):
+    """
+    [NHIỆM VỤ]: Competition Submission Helper.
+    - Tự động đóng gói kết quả tìm kiếm (tên video, mã frame hoặc câu trả lời VQA).
+    - Ghi định dạng chuẩn vào file `.csv` để chuẩn bị nộp bài cho các vòng đấu.
+    """
     try:
         output_dir = r"C:\Users\XPS 15 9570\Downloads\submission"
         os.makedirs(output_dir, exist_ok=True)
