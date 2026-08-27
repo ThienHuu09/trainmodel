@@ -1,18 +1,18 @@
  pip install -r requirements.txt
 
-trake embedding: https://www.kaggle.com/datasets/bivnvinh/json-cui-cng
+trake embedding: https://www.kaggle.com/datasets/bivnvinh/embedding-batch-1-trake
 
 ocr embedding : https://www.kaggle.com/datasets/thinhunguyn/ocrhehe
 
-asr embedding: https://www.kaggle.com/datasets/emb3rw/finalasr/data?fbclid=IwY2xjawT04_lwZG9mA2V4dG4DYWVtAjExAHNydGMGYXBwX2lkATAAAR6pVtPXY09zId3dRYkgDRf3KCh7qRwGTddDS4BHTQptzAjU4L3rcw7QBjpyOw_aem_PbV_Cz6Cy9hgUdpamyuszw
+asr embedding: https://www.kaggle.com/datasets/emb3rw/asr-gemma/data
 
-semantic embedding: https://www.kaggle.com/datasets/thinhunguyn/jsonaic
+semantic embedding: https://www.kaggle.com/datasets/aic2026cuathinhuu/fixedbatch1
 
 dataset: https://www.kaggle.com/datasets/thinhunguyn/aic2026
 
 mapkeyframes: https://www.kaggle.com/datasets/thinhunguyn/map-keyframes26
 
-videos: https://www.kaggle.com/datasets/emb3rw/data-asr-model?select=video
+videos: https://docs.google.com/spreadsheets/d/1rfn1fieTThS_Ki3SIoJ6uXOx2AhMq7wGCak6W4jZyZM/edit?pli=1&gid=0#gid=0
 
 ## 📂 Cấu trúc Thư mục Dự án AIC2026
 
