@@ -1,79 +1,61 @@
-import ijson
+import json
 from qdrant_client import QdrantClient
-from qdrant_client.http import models
+from qdrant_client.models import PointStruct, VectorParams, Distance
 
+# 1. KẾT NỐI QDRANT CHẾ ĐỘ LOCAL
 QDRANT_URL = "http://localhost:6333"
-COLLECTION_NAME = "bge-m3audio"
-JSON_FILE_PATH = r"C:\AIC2026\jsonupload\FinalASR.json"
+client = QdrantClient(url=QDRANT_URL)
 
-def main():
-    print("⏳ Đang kết nối Qdrant...")
-    # Thêm check_compatibility=False để bỏ qua cảnh báo lệch phiên bản client/server
-    client = QdrantClient(url=QDRANT_URL, timeout=60, check_compatibility=False) 
+# ✅ ĐỔI TÊN COLLECTION 
+collection_name = "embeddinggemma_audio"
 
-    vector_size = 768  # bge-m3 dense embedding = 768 chiều
-
-    if client.collection_exists(collection_name=COLLECTION_NAME):
-        print(f"🗑️ Xóa collection cũ '{COLLECTION_NAME}'...")
-        client.delete_collection(collection_name=COLLECTION_NAME)
-
-    print(f"✨ Tạo mới collection '{COLLECTION_NAME}' (size={vector_size}, Cosine)...")
+# 2. KIỂM TRA VÀ TẠO COLLECTION (✅ ĐỔI THÀNH 768 CHIỀU CHO GEMMA)
+if not client.collection_exists(collection_name):
     client.create_collection(
-        collection_name=COLLECTION_NAME,
-        vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE)
+        collection_name=collection_name,
+        vectors_config=VectorParams(size=768, distance=Distance.COSINE),
+    )
+    print(f"[*] Đã tạo mới collection: {collection_name}")
+else:
+    print(f"[*] Collection '{collection_name}' đã tồn tại, sẽ nạp thêm data vào.")
+
+# 3. ĐỌC FILE JSON TỪ KAGGLE
+# (Bác nhớ trỏ đúng tới file JSON vừa được tạo bằng Gemma)
+input_json_path =r"C:\AIC2026\jsonupload\FinalASR.json"
+
+print(f"📂 Đang đọc dữ liệu từ {input_json_path}...")
+with open(input_json_path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+# 4. CHUẨN BỊ PAYLOAD
+points = []
+for item in data:
+    points.append(
+        PointStruct(
+            id=item["id"],
+            vector=item["embedding"],
+            payload={
+                "video_name": item.get("video_name", ""),
+                "asr_start": item.get("asr_start", 0.0),
+                "asr_end": item.get("asr_end", 0.0),
+                "text": item.get("text", ""),
+                "pts_time": item.get("pts_time", 0.0),
+                "frame_id": item.get("frame_id", 0),
+                "image_path": item.get("image_path", "")
+            }
+        )
     )
 
-    print(f"📂 Đang đọc file JSON bằng ijson (streaming): {JSON_FILE_PATH}...")
-    
-    batch_size = 500
-    points = []
-    skipped_count = 0
-    total_processed = 0
+# 5. ĐẨY VÀO QDRANT LOCAL BẰNG BATCH
+batch_size = 500
+print(f"🚀 Đang bắt đầu đẩy {len(points)} bản ghi lên collection '{collection_name}'...")
 
-    # Mở file ở chế độ nhị phân ('rb') để ijson xử lý streaming không tốn RAM
-    with open(JSON_FILE_PATH, 'rb') as f:
-        # ijson.items duyệt qua từng item trong mảng JSON lớn [...]
-        items = ijson.items(f, 'item')
+for i in range(0, len(points), batch_size):
+    batch = points[i : i + batch_size]
+    client.upsert(
+        collection_name=collection_name,
+        points=batch
+    )
+    print(f"✅ Đã đẩy batch từ {i} đến {min(i + batch_size, len(points))}")
 
-        for item in items:
-            total_processed += 1
-            vector_data = item.get("embedding")
-
-            # Bỏ qua bản ghi thiếu embedding hoặc thiếu ID để tránh sập code
-            if vector_data is None or len(vector_data) == 0 or item.get("id") is None:
-                skipped_count += 1
-                continue
-
-            points.append(
-                models.PointStruct(
-                    id=int(item.get("id")),  # dùng id có sẵn trong file
-                    vector=vector_data,
-                    payload={
-                        "video_name": str(item.get("video_name", "")),
-                        "text": str(item.get("text", "")),
-                        "asr_start": float(item.get("asr_start", 0)),
-                        "asr_end": float(item.get("asr_end", 0)),
-                        "pts_time": float(item.get("pts_time", 0)),
-                        "frame_id": int(item.get("frame_id", 0)),
-                        "image_path": str(item.get("image_path", "")),
-                    }
-                )
-            )
-
-            # Khi đủ batch_size thì tiến hành đẩy lên Qdrant luôn để giải phóng RAM
-            if len(points) >= batch_size:
-                client.upsert(collection_name=COLLECTION_NAME, points=points)
-                print(f"✅ Đã upload batch tới bản ghi thứ {total_processed}...")
-                points = []  # Reset mảng batch
-
-        # Đẩy nốt phần dữ liệu dư còn lại cuối cùng
-        if points:
-            client.upsert(collection_name=COLLECTION_NAME, points=points)
-
-    if skipped_count > 0:
-        print(f"⚠️ Đã bỏ qua {skipped_count} bản ghi bị thiếu embedding hoặc thiếu ID.")
-
-    print(f"🎉 Hoàn tất upload ASR! Đã xử lý tổng cộng {total_processed} bản ghi.")
-
-if __name__ == "__main__":
-    main()
+print("🎉 Hoàn tất nạp toàn bộ dữ liệu ASR của Gemma vào ổ cứng!")
