@@ -6,7 +6,7 @@
     <title>N0N-L1NERS</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        .trake-inputs-container, .ocr-image-box {
+        .trake-inputs-container, .lookup-image-box {
             display: none; 
             flex-direction: column;
             gap: 8px;
@@ -43,7 +43,7 @@
         }
         .drop-zone:hover { background: #f1f5f9; }
         .drop-zone p { margin: 0; font-size: 13px; color: #475569; }
-        #ocrPreviewImg { max-height: 80px; margin-top: 5px; display: none; border-radius: 4px; }
+        #lookupPreviewImg { max-height: 80px; margin-top: 5px; display: none; border-radius: 4px; }
         
         .feature-tabs {
             display: flex;
@@ -151,17 +151,13 @@
                 <button id="searchBtn">🔍 SEARCH</button>
             </div>
 
-            <div class="ocr-image-box" id="ocrBox">
-                <div class="search-bar-box" style="margin-bottom: 4px;">
-                    <input type="text" id="ocrTextInput" placeholder="Hoặc nhập văn bản OCR cần tìm..." />
-                    <button id="searchOcrTextBtn">🔍 TÌM TEXT</button>
-                </div>
+            <div class="lookup-image-box" id="lookupBox">
                 <div class="drop-zone" id="dropZone">
-                    <p>📂 Kéo thả ảnh vào đây hoặc <strong>bấm để chọn ảnh</strong> tìm kiếm tương đồng</p>
-                    <input type="file" id="ocrImageInput" accept="image/*" style="display: none;" />
-                    <img id="ocrPreviewImg" src="" alt="Preview Image" />
+                    <p>📂 Kéo thả ảnh keyframe gốc (chưa chỉnh sửa) vào đây hoặc <strong>bấm để chọn ảnh</strong> để tra cứu lại metadata</p>
+                    <input type="file" id="lookupImageInput" accept="image/*" style="display: none;" />
+                    <img id="lookupPreviewImg" src="" alt="Preview Image" />
                 </div>
-                <button id="searchOcrImgBtn" style="padding: 8px; background: #4f46e5; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🚀 TÌM KIẾM ẢNH TƯƠNG ĐỒNG</button>
+                <button id="searchLookupImgBtn" style="padding: 8px; background: #4f46e5; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🔎 TRA CỨU KEYFRAME</button>
             </div>
 
             <div class="trake-inputs-container" id="trakeBox">
@@ -177,9 +173,8 @@
             <div class="left-content">
                 <div class="feature-tabs">
                     <button class="tab-btn active" data-mode="semantic">Semantic</button>
-                    <button class="tab-btn" data-mode="ocr">OCR</button>
+                    <button class="tab-btn" data-mode="lookup">🔎 Tra cứu ảnh</button>
                     <button class="tab-btn" data-mode="asr">ASR</button>
-                    <button class="tab-btn" data-mode="semantic+ocr">semantic+ocr</button>
                     <button class="tab-btn" data-mode="semantic+asr">semantic+asr</button>
                     <button class="tab-btn" data-mode="vqa">VQA (Kết hợp)</button>
                     <button class="tab-btn" data-mode="trake">TraKE</button>
@@ -234,13 +229,11 @@
         const searchBtn = document.getElementById('searchBtn');
         const singleSearchBox = document.getElementById('singleSearchBox');
         
-        const ocrBox = document.getElementById('ocrBox');
-        const ocrTextInput = document.getElementById('ocrTextInput');
-        const searchOcrTextBtn = document.getElementById('searchOcrTextBtn');
+        const lookupBox = document.getElementById('lookupBox');
         const dropZone = document.getElementById('dropZone');
-        const ocrImageInput = document.getElementById('ocrImageInput');
-        const ocrPreviewImg = document.getElementById('ocrPreviewImg');
-        const searchOcrImgBtn = document.getElementById('searchOcrImgBtn');
+        const lookupImageInput = document.getElementById('lookupImageInput');
+        const lookupPreviewImg = document.getElementById('lookupPreviewImg');
+        const searchLookupImgBtn = document.getElementById('searchLookupImgBtn');
 
         const trakeBox = document.getElementById('trakeBox');
         const searchTrakeBtn = document.getElementById('searchTrakeBtn');
@@ -261,15 +254,14 @@
 
         let primaryMode = 'semantic'; 
         let isVqaCombined = false;    
-        let selectedOcrFile = null;
+        let selectedLookupFile = null;
         let trakeSelectedFrames = []; 
         let currentSelectedCardItem = null;
 
         const tabConfigs = {
             'semantic': { placeholder: 'Nhập từ khóa truy vấn ngữ nghĩa...', status: '🔍 Đang ở chế độ Semantic Search.' },
-            'ocr': { status: '🔤 Đang ở chế độ OCR.' },
+            'lookup': { status: '🔎 Đang ở chế độ Tra cứu ảnh (Reverse Lookup).' },
             'asr': { placeholder: 'Nhập từ khóa lời thoại...', status: '🎙️ Đang ở chế độ ASR Search.' },
-            'semantic+ocr': { placeholder: 'Nhập truy vấn semantic + ocr...', status: '🔤🔍 Đang ở chế độ Semantic + OCR.' },
             'semantic+asr': { placeholder: 'Nhập truy vấn semantic + asr...', status: '🎙️🔍 Đang ở chế độ Semantic + ASR.' },
             'vqa': { status: '🤖 Đã kích hoạt VQA kết hợp.' },
             'trake': { status: '⏱️ Đang ở chế độ TraKE (Chọn frame rồi bấm Xác nhận).' }
@@ -277,13 +269,13 @@
 
         function updateUIState() {
             singleSearchBox.style.display = 'none';
-            ocrBox.style.display = 'none';
+            lookupBox.style.display = 'none';
             trakeBox.style.display = 'none';
             trakeQueueInfo.style.display = 'none';
             trakeActionsBar.style.display = 'none';
 
-            if (primaryMode === 'ocr') {
-                ocrBox.style.display = 'flex';
+            if (primaryMode === 'lookup') {
+                lookupBox.style.display = 'flex';
             } else if (primaryMode === 'trake') {
                 trakeBox.style.display = 'flex';
                 trakeQueueInfo.style.display = 'block';
@@ -341,7 +333,7 @@
             updateUIState();
         });
 
-        dropZone.addEventListener('click', () => ocrImageInput.click());
+        dropZone.addEventListener('click', () => lookupImageInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = '#e2e8f0'; });
         dropZone.addEventListener('dragleave', () => { dropZone.style.background = '#f8fafc'; });
         dropZone.addEventListener('drop', (e) => {
@@ -349,14 +341,14 @@
             dropZone.style.background = '#f8fafc';
             if (e.dataTransfer.files && e.dataTransfer.files[0]) handleSelectedImage(e.dataTransfer.files[0]);
         });
-        ocrImageInput.addEventListener('change', (e) => {
+        lookupImageInput.addEventListener('change', (e) => {
             if (e.target.files && e.target.files[0]) handleSelectedImage(e.target.files[0]);
         });
 
         function handleSelectedImage(file) {
-            selectedOcrFile = file;
+            selectedLookupFile = file;
             const reader = new FileReader();
-            reader.onload = (e) => { ocrPreviewImg.src = e.target.result; ocrPreviewImg.style.display = 'block'; };
+            reader.onload = (e) => { lookupPreviewImg.src = e.target.result; lookupPreviewImg.style.display = 'block'; };
             reader.readAsDataURL(file);
         }
 
@@ -505,8 +497,6 @@
                 let endpoint = 'search';
                 if (primaryMode === 'asr') {
                     endpoint = 'search-asr';
-                } else if (primaryMode === 'semantic+ocr') {
-                    endpoint = 'search/semantic+ocr';
                 } else if (primaryMode === 'semantic+asr') {
                     endpoint = 'search/semantic+asr';
                 }
@@ -519,59 +509,39 @@
             }
         }
 
-        async function performOcrTextSearch() {
-            const textQuery = ocrTextInput.value.trim();
-            if (!textQuery) {
-                alert("Vui lòng nhập văn bản OCR cần tìm!");
+        async function performImageLookup() {
+            if (!selectedLookupFile) {
+                alert("Vui lòng chọn hoặc kéo thả một hình ảnh keyframe để tra cứu!");
                 return;
             }
-            try {
-                const res = await fetch(`http://127.0.0.1:8000/api/search/ocr?prompt=${encodeURIComponent(textQuery)}&top_k=50`);
-                const data = await res.json();
-                if (data.results) {
-                    renderGallery(data.results);
-                } else {
-                    alert("Không tìm thấy kết quả phù hợp.");
-                }
-            } catch (err) {
-                alert("❌ Không thể kết nối tới Server khi tìm OCR text.");
-            }
-        }
 
-        searchOcrTextBtn.addEventListener('click', performOcrTextSearch);
-        ocrTextInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') performOcrTextSearch();
-        });
-
-        async function performOcrImageSearch() {
-            if (!selectedOcrFile) {
-                alert("Vui lòng chọn hoặc kéo thả một hình ảnh để tìm kiếm!");
-                return;
-            }
-            
             const formData = new FormData();
-            formData.append("file", selectedOcrFile);
+            formData.append("file", selectedLookupFile);
 
             try {
-                statusBar.textContent = "⏳ Đang tải ảnh lên và tìm kiếm...";
-                const res = await fetch(`http://127.0.0.1:8000/api/search/image`, {
+                statusBar.textContent = "⏳ Đang tải ảnh lên và tra cứu...";
+                const res = await fetch(`http://127.0.0.1:8000/api/lookup/image`, {
                     method: 'POST',
                     body: formData
                 });
                 const data = await res.json();
-                if (data.results) {
+                if (data.results && data.results.length > 0) {
                     renderGallery(data.results);
-                    statusBar.textContent = `🚀 Tìm kiếm ảnh hoàn tất (${data.results.length} kết quả)`;
+                    if (data.match_type === 'exact') {
+                        statusBar.textContent = `✅ Khớp CHÍNH XÁC 100% — đã tìm thấy đúng keyframe gốc.`;
+                    } else {
+                        statusBar.textContent = `⚠️ Không khớp hash chính xác — hiển thị ${data.results.length} kết quả GẦN GIỐNG NHẤT (approximate).`;
+                    }
                 } else {
-                    alert("Không tìm thấy ảnh tương đồng.");
+                    alert("Không tra cứu được keyframe nào phù hợp.");
                 }
             } catch (err) {
-                alert("❌ Lỗi kết nối khi gửi ảnh tìm kiếm.");
-                statusBar.textContent = "❌ Lỗi tìm kiếm ảnh.";
+                alert("❌ Lỗi kết nối khi gửi ảnh tra cứu.");
+                statusBar.textContent = "❌ Lỗi tra cứu ảnh.";
             }
         }
 
-        searchOcrImgBtn.addEventListener('click', performOcrImageSearch);
+        searchLookupImgBtn.addEventListener('click', performImageLookup);
 
         async function performTrakeSearch() {
             const t1 = document.getElementById('trakeInput1').value.trim();
