@@ -1,8 +1,7 @@
  pip install -r requirements.txt
  
-client = QdrantClient(url=QDRANT_URL, timeout=120.0)
 
-trake embedding: https://www.kaggle.com/datasets/bivnvinh/embedding-batch-1-trake
+trake embedding:  https://www.kaggle.com/datasets/aic2026cuathinhuu/fixedbatch1
 
 ocr embedding : https://www.kaggle.com/datasets/thinhunguyn/ocrhehe
 
