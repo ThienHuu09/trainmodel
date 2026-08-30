@@ -5,18 +5,32 @@ import bisect
 import hashlib
 import pickle
 import traceback
+import argparse
 import torch
 import open_clip
 import numpy as np
 from fastapi import FastAPI, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 from sentence_transformers import SentenceTransformer
 from pydantic import BaseModel
 from PIL import Image
+import io
+
+# ==========================================
+# ĐỌC THAM SỐ DÒNG LỆNH
+# ==========================================
+_arg_parser = argparse.ArgumentParser()
+_arg_parser.add_argument(
+    "--new", action="store_true",
+    help="Quét lại Qdrant để cập nhật hash index (dùng khi vừa thêm batch ảnh mới). "
+         "Không truyền cờ này -> load thẳng pickle cache cũ cho khởi động nhanh."
+)
+_cli_args, _ = _arg_parser.parse_known_args()
+FORCE_RESCAN_HASH_INDEX = _cli_args.new
 
 # ==========================================
 # CẤU HÌNH THIẾT BỊ (Full CPU)
@@ -51,12 +65,8 @@ qdrant_client = QdrantClient(host="localhost", port=6333)
 print("✅ Đã kết nối Qdrant thành công! (Không lưu trữ collection trong RAM)")
 
 # ==========================================
-# HASH INDEX CHO REVERSE IMAGE LOOKUP (thay thế tính năng OCR)
+# HASH INDEX CHO REVERSE IMAGE LOOKUP
 # ==========================================
-# Mục đích: người dùng đưa lên 1 ảnh keyframe LẤY NGUYÊN VẸN từ dataset
-# (không chỉnh sửa/nén lại) -> tra cứu lại đúng metadata (video_name,
-# frame_id, image_path, pts_time) đã gắn sẵn trong Qdrant.
-# Vì ảnh không đổi -> so khớp SHA-256 là chính xác 100%, không cần AI.
 def compute_sha256(file_path: str, chunk_size: int = 65536) -> str:
     h = hashlib.sha256()
     with open(file_path, "rb") as f:
@@ -69,17 +79,18 @@ def compute_sha256(file_path: str, chunk_size: int = 65536) -> str:
 
 
 def build_or_load_hash_index() -> dict:
-    """
-    Build (lần đầu) hoặc cập nhật gia tăng (incremental) hash index.
-    - Lần đầu (chưa có cache): quét TOÀN BỘ collection, hash hết.
-    - Các lần sau (đã có cache, có thêm batch mới trong Qdrant): CHỈ hash
-      những image_path CHƯA từng xuất hiện trong cache cũ — không hash lại
-      những ảnh batch cũ đã xử lý, tiết kiệm thời gian đáng kể.
-    """
     index = {}
     processed_paths = set()
 
-    if os.path.exists(HASH_INDEX_CACHE_PATH):
+    # Nếu có cờ --new, ta xóa cache cũ đi để quét lại từ đầu
+    if FORCE_RESCAN_HASH_INDEX and os.path.exists(HASH_INDEX_CACHE_PATH):
+        try:
+            os.remove(HASH_INDEX_CACHE_PATH)
+            print(f"🗑️ Đã xóa cache cũ tại '{HASH_INDEX_CACHE_PATH}' do có cờ --new.")
+        except Exception as e:
+            print(f"⚠️ Không thể xóa file cache: {e}")
+
+    if not FORCE_RESCAN_HASH_INDEX and os.path.exists(HASH_INDEX_CACHE_PATH):
         print("⏳ Đang tải hash index đã build sẵn từ cache...")
         try:
             with open(HASH_INDEX_CACHE_PATH, "rb") as f:
@@ -88,6 +99,7 @@ def build_or_load_hash_index() -> dict:
             processed_paths = set(cached.get("processed_paths", []))
             print(f"✅ Đã tải {len(index)} hash từ cache "
                   f"({len(processed_paths)} ảnh đã xử lý trước đó).")
+            return index
         except Exception as e:
             print(f"⚠️  Cache hash index bị lỗi, sẽ build lại từ đầu: {e}")
             index, processed_paths = {}, set()
@@ -113,9 +125,7 @@ def build_or_load_hash_index() -> dict:
                 continue
             scanned += 1
 
-            # Bỏ qua ảnh đã hash từ lần chạy trước (đây là chỗ tiết kiệm
-            # thời gian khi thêm batch2, batch3... về sau)
-            if image_path in processed_paths:
+            if not FORCE_RESCAN_HASH_INDEX and image_path in processed_paths:
                 skipped += 1
                 continue
 
@@ -143,9 +153,8 @@ def build_or_load_hash_index() -> dict:
             break
 
     print(f"✅ Cập nhật hash index xong trong {time.time() - _t0:.1f}s: "
-          f"{newly_hashed} ảnh MỚI vừa hash, {skipped} ảnh cũ được bỏ qua "
-          f"(không hash lại), {missing} file không tìm thấy trên ổ cứng. "
-          f"Tổng hiện có: {len(index)} hash.")
+          f"{newly_hashed} ảnh MỚI vừa hash, {skipped} ảnh cũ được bỏ qua, "
+          f"{missing} file không tìm thấy. Tổng hiện có: {len(index)} hash.")
 
     try:
         with open(HASH_INDEX_CACHE_PATH, "wb") as f:
@@ -162,12 +171,6 @@ HASH_INDEX = build_or_load_hash_index()
 
 @app.post("/api/admin/reload-hash-index")
 def reload_hash_index():
-    """
-    [NHIỆM VỤ]: Gọi API này SAU KHI upsert xong 1 batch mới (batch2, batch3...)
-    vào Qdrant, để cập nhật hash index mà KHÔNG cần restart cả server
-    (tránh phải load lại DFN5B/TraKE/EmbeddingGemma vốn tốn thời gian).
-    Chỉ hash các ảnh MỚI, không hash lại ảnh batch cũ (xem build_or_load_hash_index).
-    """
     global HASH_INDEX
     try:
         HASH_INDEX = build_or_load_hash_index()
@@ -190,26 +193,14 @@ print("✅ OpenCLIP đã sẵn sàng trên CPU!")
 print("⏳ Đang tải mô hình Embedding Gemma lên CPU...")
 GEMMA_EMBEDDING_MODEL_NAME = "google/embeddinggemma-300m"  
 try:
-    # Đổi tên biến bge_model thành embedding_model cho hợp lý
     embedding_model = SentenceTransformer(GEMMA_EMBEDDING_MODEL_NAME, device=device)
     print("✅ Embedding Gemma đã sẵn sàng trên CPU!")
 except Exception as e:
     print(f"❌ Lỗi khi tải Embedding Gemma: {e}")
-    print("💡 Lưu ý: Hãy đảm bảo bạn đã đăng nhập Hugging Face (`huggingface-cli login`) nếu mô hình yêu cầu quyền truy cập.")
 
 # ==========================================
 # 3. TraKE (Sequential Action Search) — NẠP TOÀN BỘ EMBEDDING VÀO RAM
 # ==========================================
-# ⚡ TỐI ƯU TỐC ĐỘ TỐI ĐA: thay vì gọi Qdrant qua mạng mỗi lần search (dù
-# là ANN hay brute-force), toàn bộ embedding của collection "dfn5b_images"
-# (không đổi giữa các lần search) được tải 1 LẦN DUY NHẤT vào RAM dạng ma
-# trận numpy ngay lúc khởi động. Mỗi lần search TraKE sau đó chỉ còn là
-# 1 phép nhân ma trận numpy (BLAS, rất nhanh) — hoàn toàn không gọi Qdrant
-# qua mạng nữa. Dùng lại clip_model/clip_tokenizer (DFN5B) đã tải ở bước 1,
-# không tải thêm model thứ 2 cho cùng 1 bộ trọng số.
-#
-# ⚠️ LƯU Ý: nếu bạn re-upload/cập nhật dữ liệu trong Qdrant sau khi server
-# đã khởi động, RAM cache này KHÔNG tự cập nhật — phải restart server.
 print("⏳ Đang tải toàn bộ embedding vào RAM cho TraKE (chỉ chạy 1 lần lúc khởi động)...")
 _load_start = time.time()
 
@@ -220,7 +211,7 @@ try:
         field_schema=qmodels.PayloadSchemaType.KEYWORD
     )
 except Exception:
-    pass  # index có thể đã tồn tại, bỏ qua an toàn
+    pass
 
 ALL_VECTORS = []
 ALL_VIDEO_NAMES = []
@@ -233,7 +224,7 @@ _loaded_count = 0
 while True:
     points, _next_offset = qdrant_client.scroll(
         collection_name=IMAGE_COLLECTION_NAME,
-        limit=5000,               # batch lớn để giảm số lượt gọi mạng lúc load
+        limit=3000,
         offset=_next_offset,
         with_payload=True,
         with_vectors=True
@@ -246,22 +237,19 @@ while True:
         ALL_IMAGE_PATHS.append(p.payload.get("image_path", ""))
 
     _loaded_count += len(points)
-    if _loaded_count % 20000 < 5000:  # in tiến độ định kỳ, không spam log
+    if _loaded_count % 20000 < 5000:
         print(f"   ... đã tải {_loaded_count} điểm")
 
     if _next_offset is None:
         break
 
 if len(ALL_VECTORS) == 0:
-    print(f"❌ CẢNH BÁO: Không tải được điểm nào từ collection '{IMAGE_COLLECTION_NAME}'! "
-          f"Kiểm tra lại tên collection có đúng và đã upload dữ liệu chưa.")
+    print(f"❌ CẢNH BÁO: Không tải được điểm nào từ collection '{IMAGE_COLLECTION_NAME}'!")
 
-EMBEDDING_MATRIX = np.array(ALL_VECTORS, dtype=np.float32)  # shape: (N, 1024)
+EMBEDDING_MATRIX = np.array(ALL_VECTORS, dtype=np.float32)
 FRAME_IDS_ARR = np.array(ALL_FRAME_IDS, dtype=np.int64)
 PTS_TIMES_ARR = np.array(ALL_PTS_TIMES, dtype=np.float64)
 
-# Gom sẵn chỉ số (index) theo từng video -> khi search chỉ cần "cắt lát"
-# (slice) mảng numpy theo các index này, không cần lọc/tìm kiếm gì thêm.
 VIDEO_TO_INDICES = {}
 for i, v_name in enumerate(ALL_VIDEO_NAMES):
     VIDEO_TO_INDICES.setdefault(v_name, []).append(i)
@@ -273,7 +261,7 @@ print(f"✅ Đã nạp {len(ALL_VECTORS)} điểm ({len(VIDEO_TO_INDICES)} video
       f"({_ram_mb:.1f} MB) trong {time.time() - _load_start:.1f} giây.")
 
 # ==========================================
-# THUẬT TOÁN DP CHO TraKE (khớp chuỗi sự kiện tuần tự theo thời gian)
+# THUẬT TOÁN DP CHO TraKE
 # ==========================================
 def find_best_trake_dynamic(
     candidates_by_video,
@@ -392,19 +380,11 @@ def find_best_trake_dynamic(
 
 
 # ==========================================
-# 3. CÁC API ENDPOINTS & NHIỆM VỤ CHI TIẾT
+# CÁC API ENDPOINTS
 # ==========================================
 
 @app.get("/api/search")
 def search_semantic(prompt: str = Query(..., description="Query Text cho Image"), top_k: int = 50):
-    """
-    [NHIỆM VỤ]: Semantic Text-to-Image Search — bản KHÔNG gọi Qdrant lúc search.
-    - Nhận câu truy vấn văn bản, encode thẳng bằng clip_model (không qua Gemini
-      dịch/tối ưu nữa — dùng nguyên câu gốc).
-    - Tìm kiếm bằng phép nhân ma trận numpy trên EMBEDDING_MATRIX đã nạp sẵn
-      trong RAM lúc khởi động (dùng chung với TraKE) — KHÔNG round-trip mạng
-      tới Qdrant, nên nhanh hơn nhiều so với qdrant_client.query_points.
-    """
     if not prompt.strip():
         return {"results": []}
     try:
@@ -412,10 +392,9 @@ def search_semantic(prompt: str = Query(..., description="Query Text cho Image")
         with torch.no_grad():
             query_features = clip_model.encode_text(text_tokens)
             query_features /= query_features.norm(dim=-1, keepdim=True)
-            query_vec = query_features.float().cpu().numpy().flatten()  # (1024,)
+            query_vec = query_features.float().cpu().numpy().flatten()
 
-        # 1 phép nhân ma trận duy nhất trên TOÀN BỘ dữ liệu đã cache trong RAM
-        sim = query_vec.astype(np.float32) @ EMBEDDING_MATRIX.T  # (N,)
+        sim = query_vec.astype(np.float32) @ EMBEDDING_MATRIX.T
 
         k = min(top_k, sim.shape[0])
         top_idx_unsorted = np.argpartition(-sim, k - 1)[:k]
@@ -437,17 +416,9 @@ def search_semantic(prompt: str = Query(..., description="Query Text cho Image")
 
 @app.get("/api/search-asr")
 def search_asr(prompt: str = Query(..., description="Query Text cho ASR"), top_k: int = 50):
-    """
-    [NHIỆM VỤ]: ASR (Speech-to-Text) Search.
-    - Nhận từ khóa hoặc nội dung câu nói cần tìm kiếm.
-    - Sử dụng mô hình Embedding Gemma để chuyển câu query thành vector và tìm kiếm trực tiếp trên Qdrant Server.
-    """
     if not prompt.strip():
         return {"results": []}
     try:
-        # Dùng encode_query() thay vì encode() thường -> tự động thêm đúng
-        # prompt "task: search result | query: " theo chuẩn EmbeddingGemma,
-        # khớp với cách corpus được encode lúc index (encode_document()).
         query_vector = embedding_model.encode_query(prompt).astype(np.float32)
         query_vector = query_vector / (np.linalg.norm(query_vector) + 1e-8)
         query_list = query_vector.tolist()
@@ -476,25 +447,94 @@ def search_asr(prompt: str = Query(..., description="Query Text cho ASR"), top_k
         return {"results": [], "error": str(e)}
 
 
-@app.post("/api/lookup/image")
-async def lookup_image_exact(file: UploadFile = File(...), top_k: int = 50):
+# ==========================================
+# ENDPOINT: TÌM ẢNH LÂN CẬN (SEQUENTIAL FRAMES)
+# ==========================================
+@app.get("/api/search/sequential-frames")
+async def search_sequential_frames(
+    video_name: str = Query(..., description="Tên video, VD: L26_V105"),
+    center_frame_id: str = Query(..., description="Số thứ tự đuôi của frame gốc, VD: 127")
+):
     """
-    [NHIỆM VỤ]: Reverse Image Lookup (thay thế tính năng OCR).
-    - Dùng khi người dùng có sẵn 1 ảnh keyframe LẤY NGUYÊN VẸN từ dataset
-      (chưa qua chỉnh sửa/nén lại), cần tra lại metadata gốc (video_name,
-      frame_id, image_path, pts_time) đã gắn sẵn trong Qdrant.
-    - Tầng 1 (chính xác 100%): so khớp SHA-256 của file upload với HASH_INDEX
-      đã build sẵn từ toàn bộ ảnh trong dataset — vì ảnh không đổi nên khớp
-      hash là chắc chắn đúng, không cần AI, gần như tức thì.
-    - Tầng 2 (dự phòng, "match_type": "approximate"): nếu không tìm thấy hash
-      khớp (VD ảnh đã bị nén lại/đổi định dạng ngoài ý muốn), fallback dùng
-      CLIP encode_image + Qdrant search để tìm ảnh gần giống nhất.
+    API tìm 5 frame trước và 5 frame sau dựa vào số thứ tự đuôi image_path (nhập thủ công).
+    """
+    try:
+        clean_fid = center_frame_id.replace("#", "").replace("img_", "").split(".")[0].strip()
+        center_num = int(clean_fid)
+
+        start_num = max(0, center_num - 5)
+        end_num = center_num + 5
+
+        results = []
+        for f_id in range(start_num, end_num + 1):
+            padded_id = f"{f_id:03d}" if f_id < 1000 else str(f_id)
+            image_path = f"{video_name}/{padded_id}.webp"
+            
+            results.append({
+                "video_name": video_name,
+                "frame_id": f"#{padded_id}",
+                "image_path": image_path,
+                "pts_time": f"00:00:{(f_id * 1):02d}.000",
+                "score": 100.0 if f_id == center_num else 90.0
+            })
+
+        return {"status": "success", "results": results}
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+@app.post("/api/search/sequential-frames-upload")
+async def search_sequential_frames_by_upload(file: UploadFile = File(...)):
+    """
+    API tìm ảnh lân cận bằng cách upload trực tiếp file ảnh:
+    Tự băm SHA-256 đối chiếu HASH_INDEX để lấy ra frame gốc rồi trả về dải 11 frame lân cận.
     """
     try:
         image_bytes = await file.read()
         file_hash = hashlib.sha256(image_bytes).hexdigest()
 
-        # --- Tầng 1: exact match bằng hash ---
+        if file_hash not in HASH_INDEX:
+            return JSONResponse(
+                status_code=404, 
+                content={"status": "error", "message": "Không tìm thấy ảnh này trong dataset gốc qua mã băm."}
+            )
+
+        meta = HASH_INDEX[file_hash]
+        video_name = meta.get("video_name")
+        raw_frame_id = str(meta.get("frame_id", ""))
+        
+        clean_fid = raw_frame_id.replace("#", "").replace("img_", "").split(".")[0].strip()
+        center_num = int(clean_fid)
+
+        start_num = max(0, center_num - 5)
+        end_num = center_num + 5
+
+        results = []
+        for f_id in range(start_num, end_num + 1):
+            padded_id = f"{f_id:03d}" if f_id < 1000 else str(f_id)
+            image_path = f"{video_name}/{padded_id}.webp"
+            
+            results.append({
+                "video_name": video_name,
+                "frame_id": f"#{padded_id}",
+                "image_path": image_path,
+                "pts_time": f"00:00:{(f_id * 1):02d}.000",
+                "score": 100 if f_id == center_num else 90
+            })
+
+        return {"status": "success", "results": results}
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+@app.post("/api/lookup/image")
+async def lookup_image_exact(file: UploadFile = File(...), top_k: int = 50):
+    try:
+        image_bytes = await file.read()
+        file_hash = hashlib.sha256(image_bytes).hexdigest()
+
         if file_hash in HASH_INDEX:
             meta = HASH_INDEX[file_hash]
             return {
@@ -508,8 +548,6 @@ async def lookup_image_exact(file: UploadFile = File(...), top_k: int = 50):
                 }]
             }
 
-        # --- Tầng 2: fallback CLIP approximate search ---
-        import io
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         image_tensor = clip_preprocess(image).unsqueeze(0).to(device)
 
@@ -551,18 +589,6 @@ class TrakeRequest(BaseModel):
 
 @app.post("/api/search/trake")
 def search_trake(req: TrakeRequest):
-    """
-    [NHIỆM VỤ]: TraKE (Sequential Action Search) — bản KHÔNG gọi Qdrant lúc search.
-    - Encode từng sự kiện (trek1..trek5) bằng clip_model (DFN5B) — model đã
-      load sẵn trong RAM cho Semantic Search, không tải thêm model thứ 2.
-    - Toàn bộ embedding của "dfn5b_images" đã nạp sẵn vào RAM (EMBEDDING_MATRIX)
-      lúc khởi động -> search chỉ còn 1 phép nhân ma trận numpy duy nhất
-      (num_events, 1024) @ (1024, N) = (num_events, N), KHÔNG round-trip
-      mạng tới Qdrant nữa.
-    - Gom theo video bằng VIDEO_TO_INDICES đã tính sẵn (chỉ "cắt lát" mảng).
-    - Đưa candidates vào thuật toán DP (find_best_trake_dynamic) để tìm chuỗi
-      sự kiện đúng thứ tự thời gian, khớp nhất trong từng video.
-    """
     try:
         _t0 = time.time()
         queries = [req.trek1, req.trek2, req.trek3, req.trek4, req.trek5]
@@ -577,10 +603,9 @@ def search_trake(req: TrakeRequest):
         with torch.no_grad():
             text_feats = clip_model.encode_text(text_tokens)
             text_feats /= text_feats.norm(dim=-1, keepdim=True)
-            text_vecs = text_feats.float().cpu().numpy()  # (num_events, 1024)
+            text_vecs = text_feats.float().cpu().numpy()
 
-        # 1 phép nhân ma trận duy nhất trên TOÀN BỘ dữ liệu đã cache trong RAM
-        sim_all = text_vecs.astype(np.float32) @ EMBEDDING_MATRIX.T  # (num_events, N)
+        sim_all = text_vecs.astype(np.float32) @ EMBEDDING_MATRIX.T
 
         video_candidates = {}
         for v_name, idxs in VIDEO_TO_INDICES.items():
@@ -614,9 +639,7 @@ def search_trake(req: TrakeRequest):
                     "score": round(item["score"], 4)
                 })
 
-        print(f"⏱️  TraKE search hoàn tất trong {time.time() - _t0:.2f}s "
-              f"({num_events} sự kiện, {len(VIDEO_TO_INDICES)} video, không gọi Qdrant).")
-
+        print(f"⏱️  TraKE search hoàn tất trong {time.time() - _t0:.2f}s.")
         return {"results": output}
     except Exception as e:
         return {"results": [], "error": str(e)}
@@ -624,10 +647,6 @@ def search_trake(req: TrakeRequest):
 
 @app.get("/api/random")
 def get_random_keyframes(limit: int = 50):
-    """
-    [NHIỆM VỤ]: Random Exploration.
-    - Lấy danh sách các keyframe ngẫu nhiên từ Qdrant Server.
-    """
     try:
         scroll_result, _ = qdrant_client.scroll(
             collection_name=IMAGE_COLLECTION_NAME,
@@ -653,10 +672,6 @@ def get_random_keyframes(limit: int = 50):
 
 @app.get("/api/image")
 def get_local_image(path: str):
-    """
-    [NHIỆM VỤ]: Image File Server.
-    - Trả về tệp hình ảnh keyframe thực tế lưu trữ trên ổ cứng dựa theo đường dẫn truyền vào.
-    """
     if not os.path.isabs(path):
         win_path = os.path.join(BASE_IMAGE_DIR, path)
     else:
@@ -669,10 +684,6 @@ def get_local_image(path: str):
 
 @app.get("/api/video")
 def get_local_video(video_name: str):
-    """
-    [NHIỆM VỤ]: Video Streaming / File Server.
-    - Trả về tệp video gốc tương ứng với tên video để xem lại phân cảnh.
-    """
     filename = f"{video_name}.mp4" if not video_name.endswith(".mp4") else video_name
     video_path = os.path.join(VIDEO_DIR, filename)
     
@@ -684,16 +695,11 @@ def get_local_video(video_name: str):
 @app.post("/api/submit-csv")
 def submit_to_csv(
     mode: str = Query("semantic", description="Chế độ hiện tại: semantic, vqa, trake"),
-    video_name: str = Query(..., description="Tên video (vd: L30_V057)"),
-    frame_id: str = Query(..., description="Frame ID chính (hoặc chuỗi frame cho TraKE)"),
+    video_name: str = Query(..., description="Tên video"),
+    frame_id: str = Query(..., description="Frame ID chính"),
     filename: str = Query(..., description="Tên file CSV muốn lưu"),
     vqa_answer: str = Query("", description="Đáp án VQA nếu có")
 ):
-    """
-    [NHIỆM VỤ]: Competition Submission Helper.
-    - Tự động đóng gói kết quả tìm kiếm (tên video, mã frame hoặc câu trả lời VQA).
-    - Ghi định dạng chuẩn vào file `.csv` để chuẩn bị nộp bài cho các vòng đấu.
-    """
     try:
         output_dir = r"C:\Users\XPS 15 9570\Downloads\submission"
         os.makedirs(output_dir, exist_ok=True)
@@ -705,23 +711,18 @@ def submit_to_csv(
         clean_video_name = video_name.strip()
         
         row_data = []
-        
         if mode == "trake":
             frames = [f.replace("#", "").strip() for f in frame_id.split(",")]
             row_data = [clean_video_name] + frames
-            
         elif mode == "vqa":
             clean_frame_id = frame_id.replace("#", "").strip()
             answer = vqa_answer.strip()
-            
             if "," in answer or '"' in answer:
                 escaped_answer = answer.replace('"', '""')
                 formatted_answer = f'"{escaped_answer}"'
             else:
                 formatted_answer = answer
-                
             row_data = [clean_video_name, clean_frame_id, formatted_answer]
-            
         else:
             clean_frame_id = frame_id.replace("#", "").strip()
             row_data = [clean_video_name, clean_frame_id]
