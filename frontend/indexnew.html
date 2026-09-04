@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N0N-L1NERS - New Interface</title>
+    <title>N0N-L1NERS — v2 (Rocchio + Pre-filter + TraKE Context)</title>
     <link rel="stylesheet" href="style.css">
     <style>
+        /* ============ TraKE box ============ */
         .trake-inputs-container, .lookup-image-box {
-            display: none; 
+            display: none;
             flex-direction: column;
             gap: 8px;
             width: 100%;
@@ -23,7 +24,7 @@
             color: #3b82f6;
             min-width: 65px;
         }
-        .trake-row input {
+        .trake-row input[type="text"] {
             flex: 1;
             padding: 8px 12px;
             background: #0f172a;
@@ -32,6 +33,8 @@
             border-radius: 4px;
             font-size: 14px;
         }
+
+        /* ============ Lookup drop-zone ============ */
         .drop-zone {
             border: 2px dashed #4f46e5;
             padding: 15px;
@@ -42,13 +45,14 @@
             outline: none;
             transition: background 0.2s, border-color 0.2s;
         }
-        .drop-zone:hover, .drop-zone:focus { 
-            background: #f1f5f9; 
+        .drop-zone:hover, .drop-zone:focus {
+            background: #f1f5f9;
             border-color: #3b82f6;
         }
         .drop-zone p { margin: 0; font-size: 13px; color: #475569; }
         #lookupPreviewImg { max-height: 80px; margin-top: 5px; display: none; border-radius: 4px; }
-        
+
+        /* ============ Tab bar ============ */
         .feature-tabs {
             display: flex;
             gap: 6px;
@@ -75,16 +79,46 @@
             color: white;
             border-color: #34d399;
         }
+        .tab-btn.rocchio-active {
+            background: #8b5cf6;
+            color: white;
+            border-color: #a78bfa;
+        }
         .tab-btn.clear-btn {
             background: #ef4444;
             color: white;
             border-color: #f87171;
-            margin-left: auto;
         }
-        .tab-btn.clear-btn:hover {
-            background: #dc2626;
+        .tab-btn.clear-btn:hover { background: #dc2626; }
+
+        /* ============ Tools strip (Video filter + Auto-translate) ============ */
+        .tools-strip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+            padding: 0 4px;
+            flex-shrink: 0;
+        }
+        .tools-strip input[type="text"] {
+            width: 130px;
+            padding: 5px 8px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #38bdf8;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .tools-strip label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            cursor: pointer;
+            user-select: none;
+            font-weight: bold;
+            white-space: nowrap;
         }
 
+        /* ============ TraKE action bar ============ */
         .trake-actions-bar {
             display: none;
             gap: 8px;
@@ -99,17 +133,12 @@
             cursor: pointer;
             border: none;
         }
-        .btn-confirm-trake {
-            background: #10b981;
-            color: white;
-        }
+        .btn-confirm-trake { background: #10b981; color: white; }
         .btn-confirm-trake:hover { background: #059669; }
-        .btn-back-trake {
-            background: #f59e0b;
-            color: white;
-        }
+        .btn-back-trake { background: #f59e0b; color: white; }
         .btn-back-trake:hover { background: #d97706; }
 
+        /* ============ VQA answer box ============ */
         .vqa-answer-container {
             margin-top: 10px;
             background: #0f172a;
@@ -134,15 +163,90 @@
             font-size: 0.85rem;
         }
 
+        /* ============ Gallery ============ */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 12px;
+        }
+        .image-card {
+            position: relative;
+            content-visibility: auto; /* Tối ưu render cho danh sách dài */
+            contain-intrinsic-size: 150px;
+        }
         .image-card.trake-locked {
             border: 2px solid #10b981 !important;
             opacity: 0.85;
         }
 
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr) !important;
-            gap: 12px;
+        /* ============ Rocchio feedback card overlay ============ */
+        .rocchio-btn-group {
+            display: none;
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            gap: 3px;
+            z-index: 10;
+        }
+        .rocchio-mode .image-card:not(.trake-locked) .rocchio-btn-group {
+            display: flex;
+        }
+        .rocchio-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: none;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .rocchio-btn-pos {
+            background: rgba(16,185,129,0.9);
+            color: white;
+        }
+        .rocchio-btn-neg {
+            background: rgba(239,68,68,0.9);
+            color: white;
+        }
+        .image-card.rocchio-positive {
+            outline: 3px solid #10b981 !important;
+        }
+        .image-card.rocchio-negative {
+            outline: 3px solid #ef4444 !important;
+        }
+
+        /* ============ Rocchio action bar ============ */
+        .rocchio-action-bar {
+            display: none;
+            gap: 8px;
+            margin-top: 5px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .rocchio-action-bar.visible { display: flex; }
+        .btn-rocchio-search {
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-rocchio-search:hover { background: #7c3aed; }
+        .btn-rocchio-reset {
+            background: #475569;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -164,6 +268,7 @@
             </div>
 
             <div class="trake-inputs-container" id="trakeBox">
+                <div class="trake-row"><label>Context:</label><input type="text" id="trakeContext" placeholder="Bối cảnh chung (tùy chọn)..." /></div>
                 <div class="trake-row"><label>E1:</label><input type="text" id="trakeInput1" placeholder="Sự kiện 1..." /></div>
                 <div class="trake-row"><label>E2:</label><input type="text" id="trakeInput2" placeholder="Sự kiện 2..." /></div>
                 <div class="trake-row"><label>E3:</label><input type="text" id="trakeInput3" placeholder="Sự kiện 3..." /></div>
@@ -182,12 +287,26 @@
                     <button class="tab-btn" data-mode="semantic+ocr">semantic+ocr</button>
                     <button class="tab-btn" data-mode="vqa">VQA (Kết hợp)</button>
                     <button class="tab-btn" data-mode="trake">TraKE</button>
-                    <button class="tab-btn clear-btn" id="clearAllBtn">🧹 Clear</button>
+                    <button class="tab-btn" id="rocchioToggleBtn" data-mode="rocchio">🎯 Rocchio</button>
+
+                    <div class="tools-strip">
+                        <input type="text" id="videoFilterInput" placeholder="🎬 Lọc video (L21,L22)" title="Lọc kết quả theo prefix video" />
+                        <input type="checkbox" id="autoTranslateCheckbox" style="width:15px; height:15px; cursor:pointer;" />
+                        <label for="autoTranslateCheckbox">🌐 VI→EN</label>
+                        <button class="tab-btn clear-btn" id="clearAllBtn">🧹 Clear</button>
+                    </div>
                 </div>
 
                 <div class="trake-actions-bar" id="trakeActionsBar">
                     <button class="trake-action-btn btn-confirm-trake" id="confirmTrakeFrameBtn">✔️ Xác nhận Frame</button>
                     <button class="trake-action-btn btn-back-trake" id="backTrakeFrameBtn">↩️ Back (Hủy frame cuối)</button>
+                </div>
+
+                <div class="rocchio-action-bar" id="rocchioActionBar">
+                    <span style="font-size:12px; color:#a78bfa;">🎯 Rocchio:</span>
+                    <span id="rocchioStats" style="font-size:11px; color:#64748b;">D+=0 D-=0</span>
+                    <button class="btn-rocchio-search" id="rocchioSearchBtn">🔁 Tìm lại theo phản hồi</button>
+                    <button class="btn-rocchio-reset" id="rocchioResetBtn">♻️ Reset</button>
                 </div>
 
                 <div class="status-bar" id="statusBar">Đang ở chế độ Semantic Search.</div>
@@ -209,17 +328,16 @@
                     <p><strong>Path:</strong> <span id="metaPath">---</span></p>
                 </div>
 
-                <!-- CẢI TIẾN: Timeline Filmstrip Context tự động dưới Inspector -->
                 <div class="timeline-context-box" style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
                     <h4 style="font-size: 0.85rem; color: #60a5fa; margin-bottom: 8px;">🎞️ KHUNG HÌNH LÂN CẬN (TIMELINE)</h4>
                     <div id="timelineFilmstrip" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px;">
                         <span style="font-size: 0.75rem; color: #64748b;">(Chọn một frame bên trái để tải timeline lân cận)</span>
                     </div>
                 </div>
-                
+
                 <div class="api-submit-box" style="margin-top: 15px;">
                     <h4>TẠO FILE CSV SUBMISSION</h4>
-                    
+
                     <div class="vqa-answer-container" id="vqaAnswerBox">
                         <label>ĐÁP ÁN VQA (NẾU CÓ KẾT HỢP):</label>
                         <input type="text" id="vqaInputVal" placeholder="Nhập đáp án..." />
@@ -236,101 +354,152 @@
         </div>
     </div>
 
-    <!-- Hidden elements for state keeping -->
     <input type="hidden" id="seqVideoName" />
     <input type="hidden" id="seqFrameId" />
 
+    <template id="cardTemplate">
+        <div class="image-card">
+            <div class="image-wrapper">
+                <div class="score-badge"></div>
+                <img alt="" loading="lazy" decoding="async">
+                <div class="timestamp-badge"></div>
+                <div class="rocchio-btn-group">
+                    <button class="rocchio-btn rocchio-btn-pos" title="Positive (D+)">+</button>
+                    <button class="rocchio-btn rocchio-btn-neg" title="Negative (D-)">−</button>
+                </div>
+            </div>
+            <div class="card-info"></div>
+        </div>
+    </template>
+
     <script>
-        const queryInput = document.getElementById('queryInput');
-        const searchBtn = document.getElementById('searchBtn');
-        const singleSearchBox = document.getElementById('singleSearchBox');
-        
-        const lookupBox = document.getElementById('lookupBox');
-        const dropZone = document.getElementById('dropZone');
-        const lookupImageInput = document.getElementById('lookupImageInput');
-        const lookupPreviewImg = document.getElementById('lookupPreviewImg');
-        const searchLookupImgBtn = document.getElementById('searchLookupImgBtn');
+        const API_BASE = 'http://127.0.0.1:8000';
 
-        const seqVideoName = document.getElementById('seqVideoName');
-        const seqFrameId = document.getElementById('seqFrameId');
+        const queryInput             = document.getElementById('queryInput');
+        const searchBtn              = document.getElementById('searchBtn');
+        const singleSearchBox        = document.getElementById('singleSearchBox');
+        const autoTranslateCheckbox  = document.getElementById('autoTranslateCheckbox');
+        const videoFilterInput       = document.getElementById('videoFilterInput');
 
-        const trakeBox = document.getElementById('trakeBox');
-        const searchTrakeBtn = document.getElementById('searchTrakeBtn');
-        const vqaInputVal = document.getElementById('vqaInputVal');
-        const clearAllBtn = document.getElementById('clearAllBtn');
-        const trakeQueueInfo = document.getElementById('trakeQueueInfo');
-        const trakeCount = document.getElementById('trakeCount');
-        const trakeActionsBar = document.getElementById('trakeActionsBar');
-        const confirmTrakeFrameBtn = document.getElementById('confirmTrakeFrameBtn');
-        const backTrakeFrameBtn = document.getElementById('backTrakeFrameBtn');
+        const lookupBox              = document.getElementById('lookupBox');
+        const dropZone               = document.getElementById('dropZone');
+        const lookupImageInput       = document.getElementById('lookupImageInput');
+        const lookupPreviewImg       = document.getElementById('lookupPreviewImg');
+        const searchLookupImgBtn     = document.getElementById('searchLookupImgBtn');
 
-        const resultGallery = document.getElementById('resultGallery');
-        const statusBar = document.getElementById('statusBar');
-        const detailImg = document.getElementById('detailImg');
-        const previewPlaceholder = document.getElementById('previewPlaceholder');
-        const detailVideo = document.getElementById('detailVideo');
-        const detailVideoSource = detailVideo.querySelector('source');
+        const trakeBox               = document.getElementById('trakeBox');
+        const searchTrakeBtn         = document.getElementById('searchTrakeBtn');
 
-        let primaryMode = 'semantic'; 
-        let isVqaCombined = false;    
-        let selectedLookupFile = null;
-        let trakeSelectedFrames = []; 
+        const vqaInputVal            = document.getElementById('vqaInputVal');
+        const clearAllBtn            = document.getElementById('clearAllBtn');
+        const trakeQueueInfo         = document.getElementById('trakeQueueInfo');
+        const trakeCount             = document.getElementById('trakeCount');
+        const trakeActionsBar        = document.getElementById('trakeActionsBar');
+        const confirmTrakeFrameBtn   = document.getElementById('confirmTrakeFrameBtn');
+        const backTrakeFrameBtn      = document.getElementById('backTrakeFrameBtn');
+
+        const rocchioToggleBtn       = document.getElementById('rocchioToggleBtn');
+        const rocchioActionBar       = document.getElementById('rocchioActionBar');
+        const rocchioStats           = document.getElementById('rocchioStats');
+        const rocchioSearchBtn       = document.getElementById('rocchioSearchBtn');
+        const rocchioResetBtn        = document.getElementById('rocchioResetBtn');
+
+        const resultGallery          = document.getElementById('resultGallery');
+        const statusBar              = document.getElementById('statusBar');
+        const detailImg              = document.getElementById('detailImg');
+        const previewPlaceholder     = document.getElementById('previewPlaceholder');
+        const detailVideo            = document.getElementById('detailVideo');
+        const detailVideoSource      = detailVideo.querySelector('source');
+        const seqVideoName           = document.getElementById('seqVideoName');
+        const seqFrameId             = document.getElementById('seqFrameId');
+        const cardTemplate           = document.getElementById('cardTemplate');
+        let currentGalleryItems      = [];   // ⚡ cache dữ liệu gallery hiện tại cho event delegation
+        let currentSearchController  = null; // ⚡ huỷ request search cũ khi có request mới hơn
+
+        let primaryMode         = 'semantic';
+        let isVqaCombined       = false;
+        let isRocchioMode       = false;
+        let selectedLookupFile  = null;
+        let trakeSelectedFrames = [];
         let currentSelectedCardItem = null;
 
+        let rocchioPositivePaths = [];
+        let rocchioNegativePaths = [];
+        let lastQueryVector      = null;
+
+        async function translateIfNeeded(text) {
+            if (!text || !autoTranslateCheckbox.checked) return text;
+            try {
+                const res = await fetch(`${API_BASE}/api/translate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                if (!res.ok) return text;
+                const data = await res.json();
+                return data.translated || text;
+            } catch (e) { return text; }
+        }
+
+        function getVideoFilter() {
+            return videoFilterInput.value.trim();
+        }
+
         const tabConfigs = {
-            'semantic': { placeholder: 'Nhập từ khóa truy vấn ngữ nghĩa...', status: '🔍 Đang ở chế độ Semantic Search.' },
-            'lookup': { status: '🔎 Đang ở chế độ Tra cứu ảnh (Reverse Lookup).' },
-            'asr': { placeholder: 'Nhập từ khóa lời thoại...', status: '🎙️ Đang ở chế độ ASR Search.' },
-            'semantic+asr': { placeholder: 'Nhập truy vấn semantic + asr...', status: '🎙️🔍 Đang ở chế độ Semantic + ASR.' },
-            'semantic+ocr': { placeholder: 'Nhập truy vấn ngữ nghĩa + chữ viết...', status: '📝🔍 Đang ở chế độ Semantic + OCR.' },
-            'vqa': { status: '🤖 Đã kích hoạt VQA kết hợp.' },
-            'trake': { status: '⏱️ Đang ở chế độ TraKE (Chọn frame rồi bấm Xác nhận).' }
+            'semantic':     { placeholder: 'Nhập từ khóa truy vấn ngữ nghĩa...' },
+            'lookup':       { placeholder: '' },
+            'asr':          { placeholder: 'Nhập từ khóa lời thoại...' },
+            'semantic+asr': { placeholder: 'Nhập truy vấn semantic + asr...' },
+            'semantic+ocr': { placeholder: 'Nhập truy vấn ngữ nghĩa + chữ viết...' },
+            'vqa':          { placeholder: 'Nhập truy vấn...' },
+            'trake':        { placeholder: '' },
         };
 
         function updateUIState() {
             singleSearchBox.style.display = 'none';
-            lookupBox.style.display = 'none';
-            trakeBox.style.display = 'none';
-            trakeQueueInfo.style.display = 'none';
+            lookupBox.style.display       = 'none';
+            trakeBox.style.display        = 'none';
+            trakeQueueInfo.style.display  = 'none';
             trakeActionsBar.style.display = 'none';
 
             if (primaryMode === 'lookup') {
                 lookupBox.style.display = 'flex';
                 dropZone.focus();
             } else if (primaryMode === 'trake') {
-                trakeBox.style.display = 'flex';
-                trakeQueueInfo.style.display = 'block';
+                trakeBox.style.display        = 'flex';
+                trakeQueueInfo.style.display  = 'block';
                 trakeActionsBar.style.display = 'flex';
             } else {
                 singleSearchBox.style.display = 'flex';
-                if (tabConfigs[primaryMode] && tabConfigs[primaryMode].placeholder) {
-                    queryInput.placeholder = tabConfigs[primaryMode].placeholder;
-                }
+                const ph = tabConfigs[primaryMode]?.placeholder;
+                if (ph !== undefined) queryInput.placeholder = ph;
             }
 
             let modeDesc = primaryMode.toUpperCase();
-            if (isVqaCombined) modeDesc += " + VQA";
-            statusBar.textContent = `🚀 Chế độ hiện tại: ${modeDesc}`;
+            if (isVqaCombined) modeDesc += ' + VQA';
+            if (isRocchioMode) modeDesc += ' + 🎯ROCCHIO';
+            statusBar.textContent = `🚀 Chế độ: ${modeDesc}`;
+
+            rocchioActionBar.classList.toggle('visible', isRocchioMode);
+            resultGallery.classList.toggle('rocchio-mode', isRocchioMode);
         }
 
-        document.querySelectorAll('.tab-btn:not(.clear-btn)').forEach(button => {
+        document.querySelectorAll('.tab-btn:not(.clear-btn):not(#rocchioToggleBtn)').forEach(button => {
             button.addEventListener('click', () => {
                 const mode = button.getAttribute('data-mode');
+                if (!mode) return;
 
                 if (mode === 'vqa') {
                     isVqaCombined = !isVqaCombined;
-                    if (isVqaCombined) {
-                        button.classList.add('vqa-active');
-                    } else {
-                        button.classList.remove('vqa-active');
-                    }
+                    button.classList.toggle('vqa-active', isVqaCombined);
                 } else {
-                    document.querySelectorAll('.tab-btn:not([data-mode="vqa"], .clear-btn)').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-btn:not([data-mode="vqa"]):not(.clear-btn):not(#rocchioToggleBtn)')
+                        .forEach(b => b.classList.remove('active'));
                     button.classList.add('active');
                     primaryMode = mode;
-                    
+
                     if (primaryMode === 'trake') {
-                        trakeSelectedFrames = [];
+                        trakeSelectedFrames   = [];
                         trakeCount.textContent = '0';
                         currentSelectedCardItem = null;
                     }
@@ -339,39 +508,111 @@
             });
         });
 
-        clearAllBtn.addEventListener('click', () => {
-            primaryMode = 'semantic';
-            isVqaCombined = false;
-            vqaInputVal.value = '';
-            trakeSelectedFrames = [];
-            trakeCount.textContent = '0';
-            currentSelectedCardItem = null;
-            seqVideoName.value = '';
-            seqFrameId.value = '';
-            lookupPreviewImg.style.display = 'none';
-            selectedLookupFile = null;
-            document.getElementById('timelineFilmstrip').innerHTML = '<span style="font-size: 0.75rem; color: #64748b;">(Chọn một frame bên trái để tải timeline lân cận)</span>';
-
-            document.querySelectorAll('.tab-btn:not(.clear-btn)').forEach(b => b.classList.remove('active', 'vqa-active'));
-            document.querySelector('[data-mode="semantic"]').classList.add('active');
-            document.querySelectorAll('.image-card').forEach(c => c.classList.remove('trake-locked', 'selected'));
-
+        rocchioToggleBtn.addEventListener('click', () => {
+            isRocchioMode = !isRocchioMode;
+            rocchioToggleBtn.classList.toggle('rocchio-active', isRocchioMode);
+            if (!isRocchioMode) {
+                document.querySelectorAll('.image-card').forEach(c => {
+                    c.classList.remove('rocchio-positive', 'rocchio-negative');
+                });
+            }
             updateUIState();
         });
 
-        dropZone.addEventListener('click', () => {
-            dropZone.focus();
-            lookupImageInput.click();
+        function updateRocchioStats() {
+            rocchioStats.textContent = `D+=${rocchioPositivePaths.length} D−=${rocchioNegativePaths.length}`;
+        }
+
+        rocchioSearchBtn.addEventListener('click', performRocchioSearch);
+        rocchioResetBtn.addEventListener('click', () => {
+            rocchioPositivePaths = [];
+            rocchioNegativePaths = [];
+            lastQueryVector = null;
+            document.querySelectorAll('.image-card').forEach(c => {
+                c.classList.remove('rocchio-positive', 'rocchio-negative');
+            });
+            updateRocchioStats();
+            statusBar.textContent = '🎯 Rocchio đã reset. D+/D− đã xoá.';
         });
+
+        async function performRocchioSearch() {
+            if (rocchioPositivePaths.length === 0 && rocchioNegativePaths.length === 0) {
+                statusBar.textContent = '⚠️ Rocchio: chưa chọn D+ hoặc D−. Bấm +/− trên ảnh trước.';
+                return;
+            }
+            statusBar.textContent = '⏳ Rocchio: đang tính lại kết quả...';
+            const t0 = performance.now();
+            try {
+                const body = {
+                    prompt: queryInput.value.trim(),
+                    query_vector: lastQueryVector || null,
+                    positive_paths: rocchioPositivePaths,
+                    negative_paths: rocchioNegativePaths,
+                    alpha: 1.0,
+                    beta: 0.75,
+                    gamma: 0.15,
+                    top_k: 50,
+                    embedding_type: primaryMode === 'asr' ? 'asr' : 'semantic',
+                    video_filter: getVideoFilter(),
+                };
+                const res  = await fetch(`${API_BASE}/api/search/rocchio`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.results) {
+                    renderGallery(data.results);
+                    if (data.rocchio_vector) lastQueryVector = data.rocchio_vector;
+                    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+                    const st = data.stats || {};
+                    statusBar.textContent =
+                        `🎯 Rocchio xong ${elapsed}s — ${data.results.length} kết quả ` +
+                        `(D+ matched ${st.positive_found ?? '?'}, D− matched ${st.negative_found ?? '?'})`;
+                }
+            } catch (e) {
+                statusBar.textContent = '❌ Lỗi Rocchio search.';
+            }
+        }
+
+        clearAllBtn.addEventListener('click', () => {
+            primaryMode             = 'semantic';
+            isVqaCombined           = false;
+            isRocchioMode           = false;
+            rocchioPositivePaths    = [];
+            rocchioNegativePaths    = [];
+            lastQueryVector         = null;
+            trakeSelectedFrames     = [];
+            trakeCount.textContent  = '0';
+            currentSelectedCardItem = null;
+            seqVideoName.value      = '';
+            seqFrameId.value        = '';
+            vqaInputVal.value       = '';
+            lookupPreviewImg.style.display = 'none';
+            selectedLookupFile      = null;
+            document.getElementById('timelineFilmstrip').innerHTML =
+                '<span style="font-size: 0.75rem; color: #64748b;">(Chọn một frame bên trái để tải timeline lân cận)</span>';
+            document.querySelectorAll('.tab-btn:not(.clear-btn):not(#rocchioToggleBtn)')
+                .forEach(b => b.classList.remove('active', 'vqa-active'));
+            rocchioToggleBtn.classList.remove('rocchio-active');
+            document.querySelector('[data-mode="semantic"]').classList.add('active');
+            document.querySelectorAll('.image-card')
+                .forEach(c => c.classList.remove('trake-locked', 'selected', 'rocchio-positive', 'rocchio-negative'));
+            resultGallery.classList.remove('rocchio-mode');
+            updateRocchioStats();
+            updateUIState();
+        });
+
+        dropZone.addEventListener('click', () => { dropZone.focus(); lookupImageInput.click(); });
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = '#e2e8f0'; });
         dropZone.addEventListener('dragleave', () => { dropZone.style.background = '#f8fafc'; });
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.style.background = '#f8fafc';
-            if (e.dataTransfer.files && e.dataTransfer.files[0]) handleSelectedImage(e.dataTransfer.files[0]);
+            if (e.dataTransfer.files?.[0]) handleSelectedImage(e.dataTransfer.files[0]);
         });
         lookupImageInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files[0]) handleSelectedImage(e.target.files[0]);
+            if (e.target.files?.[0]) handleSelectedImage(e.target.files[0]);
         });
 
         function handleSelectedImage(file) {
@@ -384,29 +625,24 @@
         window.addEventListener('paste', async (e) => {
             const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
             if (!items) return;
-
-            let imageFile = null;
             for (const item of items) {
-                if (item.type && item.type.startsWith('image/')) {
-                    imageFile = item.getAsFile();
+                if (item.type?.startsWith('image/')) {
+                    const imageFile = item.getAsFile();
+                    if (imageFile && lookupBox.style.display === 'flex') {
+                        e.preventDefault();
+                        handleSelectedImage(imageFile);
+                        statusBar.textContent = '📋 Đã dán ảnh (Ctrl+V) vào phần Tra cứu!';
+                    }
                     break;
-                }
-            }
-
-            if (imageFile) {
-                e.preventDefault();
-                if (lookupBox.style.display === 'flex') {
-                    handleSelectedImage(imageFile);
-                    statusBar.textContent = "📋 Đã dán ảnh (Ctrl+V) thành công vào phần Tra cứu chính xác!";
                 }
             }
         });
 
         function formatSecondsToTimecode(seconds) {
             seconds = Math.max(0, Number(seconds) || 0);
-            const hh = Math.floor(seconds / 3600);
-            const mm = Math.floor((seconds % 3600) / 60);
-            const ss = Math.floor(seconds % 60);
+            const hh  = Math.floor(seconds / 3600);
+            const mm  = Math.floor((seconds % 3600) / 60);
+            const ss  = Math.floor(seconds % 60);
             const mmm = Math.floor((seconds % 1) * 1000);
             const pad = (n, len = 2) => String(n).padStart(len, '0');
             return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(mmm, 3)}`;
@@ -414,22 +650,20 @@
 
         function formatSecondsToShort(seconds) {
             seconds = Math.max(0, Number(seconds) || 0);
-            const mm = Math.floor(seconds / 60);
-            const ss = Math.floor(seconds % 60);
-            return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+            return `${String(Math.floor(seconds / 60)).padStart(2,'0')}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
         }
 
         function getFilename(imagePath) {
-            if (!imagePath) return "unknown";
-            return imagePath.split('/').pop();
+            if (!imagePath) return 'unknown';
+            return imagePath.split(/[/\\]/).pop();
         }
 
         function seekVideoToKeyframe(item) {
             if (!item.video_name) return;
-            const videoUrl = `http://127.0.0.1:8000/api/video?video_name=${encodeURIComponent(item.video_name)}`;
+            const videoUrl = `${API_BASE}/api/video?video_name=${encodeURIComponent(item.video_name)}`;
             const targetSeconds = Number(item.pts_time) || 0;
             const doSeek = () => {
-                try { detailVideo.currentTime = targetSeconds; detailVideo.muted = false; detailVideo.play().catch(() => {}); } catch(e){}
+                try { detailVideo.currentTime = targetSeconds; detailVideo.muted = false; detailVideo.play().catch(() => {}); } catch(e) {}
             };
             if (detailVideoSource.getAttribute('src').includes(encodeURIComponent(item.video_name))) {
                 doSeek();
@@ -440,330 +674,337 @@
             }
         }
 
-        // CẢI TIẾN: Tải dải Timeline lân cận bằng API
         async function loadTimelineFilmstrip(videoName, frameId) {
-            const timelineContainer = document.getElementById('timelineFilmstrip');
-            timelineContainer.innerHTML = `<span style="font-size: 0.75rem; color: #38bdf8;">⏳ Đang tải timeline lân cận...</span>`;
+            const tc = document.getElementById('timelineFilmstrip');
+            tc.innerHTML = `<span style="font-size: 0.75rem; color: #38bdf8;">⏳ Đang tải timeline...</span>`;
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/search/sequential-frames?video_name=${encodeURIComponent(videoName)}&center_frame_id=${encodeURIComponent(frameId)}`);
+                const res  = await fetch(`${API_BASE}/api/search/sequential-frames?video_name=${encodeURIComponent(videoName)}&center_frame_id=${encodeURIComponent(frameId)}`);
                 const data = await res.json();
-                if (data.results && data.results.length > 0) {
-                    timelineContainer.innerHTML = "";
-                    
-                    // Sắp xếp tăng dần theo tên file
-                    const sortedTimeline = [...data.results].sort((a, b) => {
-                        const getNum = (p) => parseInt((p || "").split('/').pop().split('.')[0], 10) || 0;
+                if (data.results?.length > 0) {
+                    tc.innerHTML = '';
+                    const sorted = [...data.results].sort((a, b) => {
+                        const getNum = p => parseInt(getFilename(p).split('.')[0], 10) || 0;
                         return getNum(a.image_path) - getNum(b.image_path);
                     });
-
                     const cleanCenter = String(frameId).replace(/^0+/, '');
-
-                    sortedTimeline.forEach(tItem => {
-                        const img = document.createElement('img');
-                        const tImgUrl = `http://127.0.0.1:8000/api/image?path=${encodeURIComponent(tItem.image_path)}`;
-                        img.src = tImgUrl;
-                        img.style.height = "55px";
-                        img.style.borderRadius = "4px";
-                        img.style.cursor = "pointer";
-                        img.style.border = "1px solid #334155";
-                        
-                        const getNum = (p) => parseInt((p || "").split('/').pop().split('.')[0], 10) || 0;
-                        const frameNum = getNum(tItem.image_path);
-                        
+                    
+                    // Sử dụng DocumentFragment để tối ưu tốc độ render DOM timeline
+                    const fragment = document.createDocumentFragment();
+                    sorted.forEach(tItem => {
+                        const img     = document.createElement('img');
+                        const tImgUrl = `${API_BASE}/api/image?path=${encodeURIComponent(tItem.image_path)}`;
+                        img.src    = tImgUrl;
+                        img.style.cssText = 'height:55px;border-radius:4px;cursor:pointer;border:1px solid #334155;flex-shrink:0;';
+                        const frameNum = parseInt(getFilename(tItem.image_path).split('.')[0], 10) || 0;
                         if (String(frameNum) === cleanCenter) {
-                            img.style.borderColor = "#60a5fa";
-                            img.style.borderWidth = "2.5px";
+                            img.style.borderColor = '#60a5fa';
+                            img.style.borderWidth = '2.5px';
                         }
-
                         img.title = `Frame: ${tItem.frame_id} | Time: ${formatSecondsToShort(tItem.pts_time)}`;
-                        
                         img.addEventListener('click', () => {
-                            // Cập nhật Keyframe Inspector khi chọn ảnh từ timeline
                             previewPlaceholder.style.display = 'none';
                             detailImg.src = tImgUrl;
                             detailImg.style.display = 'block';
-
                             document.getElementById('metaFrameId').textContent = `#${tItem.frame_id ?? '-----'}`;
-                            document.getElementById('metaTime').textContent = formatSecondsToTimecode(tItem.pts_time);
-                            document.getElementById('metaPath').textContent = tItem.image_path;
-
+                            document.getElementById('metaTime').textContent     = formatSecondsToTimecode(tItem.pts_time);
+                            document.getElementById('metaPath').textContent     = tItem.image_path;
                             seekVideoToKeyframe(tItem);
-                            
-                            // Cập nhật giá trị ẩn
                             seqVideoName.value = tItem.video_name;
-                            seqFrameId.value = String(frameNum);
-                            
-                            // Highlight ảnh đang chọn trong dải
-                            timelineContainer.querySelectorAll('img').forEach(el => {
-                                el.style.borderWidth = "1px";
-                                el.style.borderColor = "#334155";
-                            });
-                            img.style.borderWidth = "2.5px";
-                            img.style.borderColor = "#60a5fa";
-
-                            // Đồng bộ grid chọn bên trái (nếu ảnh này có hiển thị ở grid kết quả)
+                            seqFrameId.value   = String(frameNum);
+                            tc.querySelectorAll('img').forEach(el => { el.style.borderWidth = '1px'; el.style.borderColor = '#334155'; });
+                            img.style.borderWidth = '2.5px';
+                            img.style.borderColor = '#60a5fa';
                             document.querySelectorAll('.image-card').forEach(card => {
-                                const cardInfo = card.querySelector('.card-info').textContent;
-                                if (cardInfo === getFilename(tItem.image_path).replace(/\.[^/.]+$/, "")) {
-                                    document.querySelectorAll('.image-card').forEach(c => {
-                                        if (!c.classList.contains('trake-locked')) c.classList.remove('selected');
-                                    });
+                                const ci = card.querySelector('.card-info')?.textContent;
+                                if (ci === getFilename(tItem.image_path).replace(/\.[^/.]+$/, '')) {
+                                    document.querySelectorAll('.image-card').forEach(c => { if (!c.classList.contains('trake-locked')) c.classList.remove('selected'); });
                                     card.classList.add('selected');
-                                    if (primaryMode === 'trake') {
-                                        currentSelectedCardItem = { cardElement: card, frameId: String(tItem.frame_id) };
-                                    }
+                                    if (primaryMode === 'trake') currentSelectedCardItem = { cardElement: card, frameId: String(tItem.frame_id) };
                                 }
                             });
                         });
-                        
-                        timelineContainer.appendChild(img);
+                        fragment.appendChild(img);
                     });
+                    tc.appendChild(fragment);
                 } else {
-                    timelineContainer.innerHTML = `<span style="font-size: 0.75rem; color: #ef4444;">Không tìm thấy ảnh lân cận</span>`;
+                    tc.innerHTML = `<span style="font-size: 0.75rem; color: #ef4444;">Không tìm thấy ảnh lân cận</span>`;
                 }
-            } catch (err) {
-                timelineContainer.innerHTML = `<span style="font-size: 0.75rem; color: #ef4444;">Lỗi kết nối</span>`;
+            } catch {
+                tc.innerHTML = `<span style="font-size: 0.75rem; color: #ef4444;">Lỗi kết nối</span>`;
             }
         }
 
+        // ⚡ Tối ưu render gallery: dùng <template> + cloneNode (không phải
+        // parse lại HTML string cho từng card) + DocumentFragment để giảm
+        // reflow/repaint, thay vì set card.innerHTML = `...` mỗi lần.
         function renderGallery(results) {
-            resultGallery.innerHTML = ""; 
+            currentGalleryItems = results;
+            const fragment = document.createDocumentFragment();
 
-            results.forEach((item) => {
-                const card = document.createElement('div');
-                card.className = 'image-card';
-                const imgUrl = `http://127.0.0.1:8000/api/image?path=${encodeURIComponent(item.image_path)}`;
+            results.forEach((item, idx) => {
+                const card = cardTemplate.content.firstElementChild.cloneNode(true);
+                card.dataset.idx = idx;
+
+                const imgUrl   = `${API_BASE}/api/image?path=${encodeURIComponent(item.image_path)}`;
                 const filename = getFilename(item.image_path);
-                const cleanId = String(item.frame_id ?? '').replace("#", "").trim();
+                const cleanId  = String(item.frame_id ?? '').replace('#', '').trim();
 
                 if (primaryMode === 'trake' && trakeSelectedFrames.includes(cleanId)) {
                     card.classList.add('trake-locked');
                 }
+                if (isRocchioMode) {
+                    if (rocchioPositivePaths.includes(item.image_path)) card.classList.add('rocchio-positive');
+                    else if (rocchioNegativePaths.includes(item.image_path)) card.classList.add('rocchio-negative');
+                }
 
-                card.innerHTML = `
-                    <div class="image-wrapper">
-                        <div class="score-badge">🎯 ${item.score ?? 0}</div>
-                        <img src="${imgUrl}" alt="${filename}" loading="lazy">
-                        <div class="timestamp-badge">${formatSecondsToShort(item.pts_time)}</div>
-                    </div>
-                    <div class="card-info" title="${filename}">${filename.replace(/\.[^/.]+$/, "")}</div>
-                `;
+                card.querySelector('.score-badge').textContent = `🎯 ${item.score ?? 0}`;
 
-                card.addEventListener('click', () => {
-                    if (primaryMode === 'trake' && trakeSelectedFrames.includes(cleanId)) {
-                        return;
-                    }
+                const img = card.querySelector('img');
+                img.src = imgUrl;
+                img.alt = filename;
 
-                    previewPlaceholder.style.display = 'none';
-                    detailImg.src = imgUrl;
-                    detailImg.style.display = 'block';
+                card.querySelector('.timestamp-badge').textContent = formatSecondsToShort(item.pts_time);
 
-                    document.getElementById('metaFrameId').textContent = `#${item.frame_id ?? '-----'}`;
-                    document.getElementById('metaTime').textContent = formatSecondsToTimecode(item.pts_time);
-                    document.getElementById('metaPath').textContent = item.image_path || filename;
+                const info = card.querySelector('.card-info');
+                info.title = filename;
+                info.textContent = filename.replace(/\.[^/.]+$/, '');
 
-                    seekVideoToKeyframe(item);
-
-                    if (primaryMode === 'trake') {
-                        currentSelectedCardItem = { cardElement: card, frameId: cleanId };
-                    }
-
-                    if (item.video_name && item.image_path) {
-                        seqVideoName.value = item.video_name;
-                        const fn = item.image_path.split('/').pop();
-                        const fidVal = fn.split('.')[0];
-                        seqFrameId.value = fidVal;
-                        
-                        // CẢI TIẾN: Tự động nạp dải timeline lân cận!
-                        loadTimelineFilmstrip(item.video_name, fidVal);
-                    }
-
-                    document.querySelectorAll('.image-card').forEach(c => {
-                        if (!c.classList.contains('trake-locked')) c.classList.remove('selected');
-                    });
-                    card.classList.add('selected');
-                });
-                resultGallery.appendChild(card);
+                fragment.appendChild(card);
             });
+
+            // replaceChildren gộp "xoá cũ + gắn mới" thành 1 thao tác DOM
+            resultGallery.replaceChildren(fragment);
         }
 
+        // ⚡ Event delegation: 1 listener DUY NHẤT cho toàn bộ gallery thay vì
+        // gắn 2-3 listener cho MỖI card (trước đây tạo lại ~150 listener mỗi
+        // lần search 50 kết quả — vừa tốn CPU vừa tăng áp lực garbage collector).
+        resultGallery.addEventListener('click', (e) => {
+            const card = e.target.closest('.image-card');
+            if (!card) return;
+            const item = currentGalleryItems[Number(card.dataset.idx)];
+            if (!item) return;
+
+            const posBtn = e.target.closest('.rocchio-btn-pos');
+            const negBtn = e.target.closest('.rocchio-btn-neg');
+
+            if (posBtn) {
+                e.stopPropagation();
+                const path = item.image_path;
+                if (rocchioPositivePaths.includes(path)) {
+                    rocchioPositivePaths = rocchioPositivePaths.filter(p => p !== path);
+                    card.classList.remove('rocchio-positive');
+                } else {
+                    rocchioPositivePaths.push(path);
+                    rocchioNegativePaths = rocchioNegativePaths.filter(p => p !== path);
+                    card.classList.add('rocchio-positive');
+                    card.classList.remove('rocchio-negative');
+                }
+                updateRocchioStats();
+                return;
+            }
+            if (negBtn) {
+                e.stopPropagation();
+                const path = item.image_path;
+                if (rocchioNegativePaths.includes(path)) {
+                    rocchioNegativePaths = rocchioNegativePaths.filter(p => p !== path);
+                    card.classList.remove('rocchio-negative');
+                } else {
+                    rocchioNegativePaths.push(path);
+                    rocchioPositivePaths = rocchioPositivePaths.filter(p => p !== path);
+                    card.classList.add('rocchio-negative');
+                    card.classList.remove('rocchio-positive');
+                }
+                updateRocchioStats();
+                return;
+            }
+
+            if (primaryMode === 'trake' && trakeSelectedFrames.includes(String(item.frame_id ?? '').replace('#', '').trim())) return;
+
+            const imgUrl  = `${API_BASE}/api/image?path=${encodeURIComponent(item.image_path)}`;
+            const cleanId = String(item.frame_id ?? '').replace('#', '').trim();
+
+            previewPlaceholder.style.display = 'none';
+            detailImg.src = imgUrl;
+            detailImg.style.display = 'block';
+
+            document.getElementById('metaFrameId').textContent = `#${item.frame_id ?? '-----'}`;
+            document.getElementById('metaTime').textContent     = formatSecondsToTimecode(item.pts_time);
+            document.getElementById('metaPath').textContent     = item.image_path || getFilename(item.image_path);
+
+            seekVideoToKeyframe(item);
+
+            if (primaryMode === 'trake') {
+                currentSelectedCardItem = { cardElement: card, frameId: cleanId };
+            }
+            if (item.video_name && item.image_path) {
+                seqVideoName.value = item.video_name;
+                const fidVal       = getFilename(item.image_path).split('.')[0];
+                seqFrameId.value   = fidVal;
+                loadTimelineFilmstrip(item.video_name, fidVal);
+            }
+            document.querySelectorAll('.image-card').forEach(c => { if (!c.classList.contains('trake-locked')) c.classList.remove('selected'); });
+            card.classList.add('selected');
+        });
+
         confirmTrakeFrameBtn.addEventListener('click', () => {
-            if (!currentSelectedCardItem) {
-                alert("Vui lòng bấm chọn một khung hình bên trái trước khi xác nhận!");
-                return;
-            }
-            if (trakeSelectedFrames.length >= 4) {
-                alert("Bạn đã chọn tối đa 4 khung hình cho TraKE!");
-                return;
-            }
-
+            if (!currentSelectedCardItem) { alert('Vui lòng bấm chọn một khung hình bên trái trước khi xác nhận!'); return; }
+            if (trakeSelectedFrames.length >= 4) { alert('Bạn đã chọn tối đa 4 khung hình!'); return; }
             const { cardElement, frameId } = currentSelectedCardItem;
-            if (trakeSelectedFrames.includes(frameId)) {
-                alert("Khung hình này đã được chọn trước đó, không được chọn trùng lại!");
-                return;
-            }
-
+            if (trakeSelectedFrames.includes(frameId)) { alert('Khung hình này đã được chọn, không được chọn trùng!'); return; }
             trakeSelectedFrames.push(frameId);
             trakeCount.textContent = trakeSelectedFrames.length;
-            
             cardElement.classList.remove('selected');
             cardElement.classList.add('trake-locked');
             currentSelectedCardItem = null;
-
             statusBar.textContent = `⏱️ TraKE đã chốt: [${trakeSelectedFrames.join(', ')}]`;
         });
 
         backTrakeFrameBtn.addEventListener('click', () => {
-            if (trakeSelectedFrames.length === 0) {
-                alert("Chưa có khung hình nào được xác nhận để Back!");
-                return;
-            }
-
+            if (trakeSelectedFrames.length === 0) { alert('Chưa có khung hình nào được xác nhận!'); return; }
             trakeSelectedFrames.pop();
             trakeCount.textContent = trakeSelectedFrames.length;
-
-            document.querySelectorAll('.image-card').forEach(card => {
-                card.classList.remove('trake-locked');
-            });
-
-            statusBar.textContent = `⏱️ Đã hủy frame cuối. TraKE hiện tại: [${trakeSelectedFrames.join(', ')}]`;
+            document.querySelectorAll('.image-card').forEach(card => card.classList.remove('trake-locked'));
+            statusBar.textContent = `⏱️ Đã hủy frame cuối. TraKE: [${trakeSelectedFrames.join(', ')}]`;
         });
 
         async function loadRandomKeyframes() {
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/random?limit=50`);
+                const res  = await fetch(`${API_BASE}/api/random?limit=50`);
                 const data = await res.json();
                 if (data.results) renderGallery(data.results);
             } catch (e) {}
         }
 
         async function performSearch() {
-            const prompt = queryInput.value.trim();
+            let prompt = queryInput.value.trim();
             if (!prompt) return;
-            try {
-                let endpoint = 'search';
-                if (primaryMode === 'asr') {
-                    endpoint = 'search-asr';
-                } else if (primaryMode === 'semantic+asr') {
-                    endpoint = 'search/semantic+asr';
-                } else if (primaryMode === 'semantic+ocr') {
-                    endpoint = 'search/semantic+ocr';
-                }
 
-                const res = await fetch(`http://127.0.0.1:8000/api/${endpoint}?prompt=${encodeURIComponent(prompt)}&top_k=50`);
+            // ⚡ Huỷ request search trước đó (nếu còn đang chạy) — tránh trường
+            // hợp response CŨ về SAU response MỚI (do mạng chậm) rồi ghi đè
+            // nhầm lên kết quả mới hơn khi người dùng bấm search liên tục.
+            if (currentSearchController) currentSearchController.abort();
+            const controller = new AbortController();
+            currentSearchController = controller;
+
+            try {
+                if (autoTranslateCheckbox.checked) {
+                    statusBar.textContent = '⏳ Đang dịch VI → EN...';
+                    prompt = await translateIfNeeded(prompt);
+                }
+                statusBar.textContent = '⏳ Đang tìm kiếm...';
+
+                const vf = getVideoFilter();
+                let endpoint = 'search';
+                if (primaryMode === 'asr') endpoint = 'search-asr';
+                else if (primaryMode === 'semantic+asr') endpoint = 'search/semantic+asr';
+                else if (primaryMode === 'semantic+ocr') endpoint = 'search/semantic+ocr';
+
+                const url = `${API_BASE}/api/${endpoint}?prompt=${encodeURIComponent(prompt)}&top_k=50&video_filter=${encodeURIComponent(vf)}`;
+                const res  = await fetch(url, { signal: controller.signal });
                 const data = await res.json();
-                if (data.results) renderGallery(data.results);
+
+                if (data.results) {
+                    renderGallery(data.results);
+                    lastQueryVector = null;
+                    statusBar.textContent = `✅ ${data.results.length} kết quả ${vf ? '(filter: ' + vf + ')' : ''}`;
+                }
             } catch (e) {
-                alert("❌ Lỗi kết nối tới Server.");
+                if (e.name === 'AbortError') return; // bị huỷ do có search mới hơn, bỏ qua im lặng
+                alert('❌ Lỗi kết nối tới Server.');
             }
         }
 
         async function performImageLookup() {
-            if (!selectedLookupFile) {
-                alert("Vui lòng chọn, kéo thả hoặc dán hình ảnh keyframe để tra cứu!");
-                return;
-            }
-
+            if (!selectedLookupFile) { alert('Vui lòng chọn ảnh!'); return; }
             const formData = new FormData();
-            formData.append("file", selectedLookupFile);
-
+            formData.append('file', selectedLookupFile);
             try {
-                statusBar.textContent = "⏳ Đang tải ảnh lên và tra cứu...";
-                const res = await fetch(`http://127.0.0.1:8000/api/lookup/image`, {
-                    method: 'POST',
-                    body: formData
-                });
+                statusBar.textContent = '⏳ Đang tải ảnh lên và tra cứu...';
+                const res  = await fetch(`${API_BASE}/api/lookup/image`, { method: 'POST', body: formData });
                 const data = await res.json();
-                if (data.results && data.results.length > 0) {
+                if (data.results?.length > 0) {
                     renderGallery(data.results);
-                    if (data.match_type === 'exact') {
-                        statusBar.textContent = `✅ Khớp CHÍNH XÁC 100% — đã tìm thấy đúng keyframe gốc.`;
-                    } else {
-                        statusBar.textContent = `⚠️ Không khớp hash chính xác — hiển thị ${data.results.length} kết quả GẦN GIỐNG NHẤT (approximate).`;
-                    }
+                    statusBar.textContent = data.match_type === 'exact'
+                        ? '✅ Khớp CHÍNH XÁC 100%.'
+                        : `⚠️ Không khớp hash — ${data.results.length} kết quả GẦN GIỐNG NHẤT.`;
                 } else {
-                    alert("Không tra cứu được keyframe nào phù hợp.");
+                    alert('Không tra cứu được keyframe phù hợp.');
                 }
-            } catch (err) {
-                alert("❌ Lỗi kết nối khi gửi ảnh tra cứu.");
-                statusBar.textContent = "❌ Lỗi tra cứu ảnh.";
+            } catch {
+                alert('❌ Lỗi kết nối khi tra cứu ảnh.');
             }
         }
-
         searchLookupImgBtn.addEventListener('click', performImageLookup);
 
         async function performTrakeSearch() {
-            const t1 = document.getElementById('trakeInput1').value.trim();
-            const t2 = document.getElementById('trakeInput2').value.trim();
-            const t3 = document.getElementById('trakeInput3').value.trim();
-            const t4 = document.getElementById('trakeInput4').value.trim();
+            let t1 = document.getElementById('trakeInput1').value.trim();
+            let t2 = document.getElementById('trakeInput2').value.trim();
+            let t3 = document.getElementById('trakeInput3').value.trim();
+            let t4 = document.getElementById('trakeInput4').value.trim();
+            const ctx = document.getElementById('trakeContext').value.trim();
 
-            if (!t1 && !t2 && !t3 && !t4) {
-                alert("Vui lòng nhập ít nhất một sự kiện cho chuỗi TraKE!");
-                return;
-            }
+            if (!t1 && !t2 && !t3 && !t4) { alert('Vui lòng nhập ít nhất một sự kiện!'); return; }
 
             try {
-                statusBar.textContent = "⏳ Đang xử lý chuỗi truy vấn TraKE...";
-                const res = await fetch(`http://127.0.0.1:8000/api/search/trake`, {
+                if (autoTranslateCheckbox.checked) {
+                    statusBar.textContent = '⏳ Đang dịch TraKE VI → EN...';
+                    [t1, t2, t3, t4] = await Promise.all([
+                        translateIfNeeded(t1), translateIfNeeded(t2),
+                        translateIfNeeded(t3), translateIfNeeded(t4),
+                    ]);
+                }
+                statusBar.textContent = '⏳ Đang xử lý chuỗi TraKE...';
+                const body = {
+                    trek1: t1, trek2: t2, trek3: t3, trek4: t4,
+                    context: ctx,
+                    top_k: 5,
+                    video_filter: getVideoFilter(),
+                };
+                const res  = await fetch(`${API_BASE}/api/search/trake`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ trek1: t1, trek2: t2, trek3: t3, trek4: t4, trek5: "" })
+                    body: JSON.stringify(body)
                 });
                 const data = await res.json();
                 if (data.results) {
                     renderGallery(data.results);
-                    statusBar.textContent = `🚀 TraKE: Tìm thấy ${data.results.length} kết quả (Hiển thị theo hàng 4 frames)`;
+                    statusBar.textContent = `🚀 TraKE: ${data.results.length} kết quả`;
                 } else {
-                    alert("Không tìm thấy kết quả TraKE phù hợp.");
+                    alert('Không tìm thấy kết quả TraKE.');
                 }
-            } catch (err) {
-                alert("❌ Lỗi kết nối tới Server TraKE.");
-                statusBar.textContent = "❌ Lỗi tìm kiếm TraKE.";
+            } catch {
+                alert('❌ Lỗi kết nối Server TraKE.');
             }
         }
-
         searchTrakeBtn.addEventListener('click', performTrakeSearch);
 
         document.getElementById('saveCsvBtn').addEventListener('click', async () => {
             const filenameInput = document.getElementById('csvFilenameInput').value.trim();
-            const metaPathText = document.getElementById('metaPath').textContent.trim();
-            const vqaVal = vqaInputVal.value.trim();
+            const metaPathText  = document.getElementById('metaPath').textContent.trim();
+            const vqaVal        = vqaInputVal.value.trim();
 
-            if (!filenameInput) {
-                alert("Vui lòng nhập tên file CSV!");
-                return;
-            }
-            if (!metaPathText || metaPathText === "---") {
-                alert("Vui lòng chọn ít nhất một Keyframe bên trái!");
-                return;
-            }
+            if (!filenameInput) { alert('Vui lòng nhập tên file CSV!'); return; }
+            if (!metaPathText || metaPathText === '---') { alert('Vui lòng chọn ít nhất một Keyframe!'); return; }
 
-            const videoName = metaPathText.split('/')[0];
-            let frameIdParam = "";
-            let activeMode = primaryMode;
-
-            if (isVqaCombined && primaryMode !== 'trake') {
-                activeMode = 'vqa';
-            }
+            const videoName = metaPathText.split(/[/\\]/)[0];
+            let frameIdParam = '';
+            let activeMode   = primaryMode;
+            if (isVqaCombined && primaryMode !== 'trake') activeMode = 'vqa';
 
             if (activeMode === 'trake') {
-                if (trakeSelectedFrames.length === 0) {
-                    alert("Vui lòng bấm chọn và Xác nhận các frame bên trái trước khi lưu TraKE!");
-                    return;
-                }
-                frameIdParam = trakeSelectedFrames.join(",");
+                if (trakeSelectedFrames.length === 0) { alert('Vui lòng xác nhận các frame TraKE trước!'); return; }
+                frameIdParam = trakeSelectedFrames.join(',');
             } else {
-                frameIdParam = document.getElementById('metaFrameId').textContent.replace("#", "").trim();
+                frameIdParam = document.getElementById('metaFrameId').textContent.replace('#', '').trim();
             }
 
             try {
-                const url = `http://127.0.0.1:8000/api/submit-csv?mode=${activeMode}&video_name=${encodeURIComponent(videoName)}&frame_id=${encodeURIComponent(frameIdParam)}&filename=${encodeURIComponent(filenameInput)}&vqa_answer=${encodeURIComponent(vqaVal)}`;
-                const res = await fetch(url, { method: 'POST' });
+                const url  = `${API_BASE}/api/submit-csv?mode=${activeMode}&video_name=${encodeURIComponent(videoName)}&frame_id=${encodeURIComponent(frameIdParam)}&filename=${encodeURIComponent(filenameInput)}&vqa_answer=${encodeURIComponent(vqaVal)}`;
+                const res  = await fetch(url, { method: 'POST' });
                 const data = await res.json();
-                
                 if (data.status === 'success') {
-                    alert(`✅ Lưu thành công vào file ${filenameInput}.csv (Mode: ${activeMode.toUpperCase()})!`);
+                    alert(`✅ Lưu thành công: ${filenameInput}.csv (mode: ${activeMode.toUpperCase()})`);
                     if (activeMode === 'trake') {
                         trakeSelectedFrames = [];
                         trakeCount.textContent = '0';
@@ -772,53 +1013,32 @@
                 } else {
                     alert(`❌ Lỗi: ${data.message}`);
                 }
-            } catch (err) {
-                alert("❌ Không thể kết nối tới Server.");
+            } catch {
+                alert('❌ Không thể kết nối Server.');
             }
         });
 
         searchBtn.addEventListener('click', performSearch);
-        queryInput.addEventListener('keypress', (e) => { 
-            if (e.key === 'Enter') performSearch(); 
-        });
+        queryInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
 
-        // CẢI TIẾN: Thêm phím điều hướng Arrow Keys để duyệt qua các grid Keyframe kết quả
         window.addEventListener('keydown', (e) => {
-            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
-                return;
-            }
-            const cards = Array.from(resultGallery.querySelectorAll('.image-card'));
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+            const cards = resultGallery.children;
             if (cards.length === 0) return;
-
-            let currentIndex = cards.findIndex(c => c.classList.contains('selected'));
-
-            if (e.key === 'ArrowRight') {
+            let currentIndex = -1;
+            for (let i = 0; i < cards.length; i++) {
+                if (cards[i].classList.contains('selected')) { currentIndex = i; break; }
+            }
+            const COLS = 4;
+            let targetIndex = -1;
+            if (e.key === 'ArrowRight')      targetIndex = currentIndex + 1;
+            else if (e.key === 'ArrowLeft')  targetIndex = currentIndex - 1;
+            else if (e.key === 'ArrowDown')  targetIndex = currentIndex + COLS;
+            else if (e.key === 'ArrowUp')    targetIndex = currentIndex - COLS;
+            if (targetIndex >= 0 && targetIndex < cards.length) {
                 e.preventDefault();
-                let nextIndex = currentIndex + 1;
-                if (nextIndex < cards.length) {
-                    cards[nextIndex].click();
-                    cards[nextIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                }
-            } else if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                let prevIndex = currentIndex - 1;
-                if (prevIndex >= 0) {
-                    cards[prevIndex].click();
-                    cards[prevIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                }
-            } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                e.preventDefault();
-                const columns = 4; // grid có 4 cột
-                let targetIndex = currentIndex;
-                if (e.key === 'ArrowDown') {
-                    targetIndex = currentIndex + columns;
-                } else {
-                    targetIndex = currentIndex - columns;
-                }
-                if (targetIndex >= 0 && targetIndex < cards.length) {
-                    cards[targetIndex].click();
-                    cards[targetIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                }
+                cards[targetIndex].click();
+                cards[targetIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
             }
         });
 
