@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N0N-L1NERS — v2 (Rocchio + Pre-filter + TraKE Context)</title>
+    <title>N0N-L1NERS — CLIP + TraKE + DRES</title>
     <link rel="stylesheet" href="style.css">
     <style>
         /* ============ TraKE box ============ */
@@ -16,23 +16,121 @@
         .trake-row {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
         .trake-row label {
             font-weight: bold;
-            font-size: 13px;
+            font-size: 11px;
             color: #3b82f6;
-            min-width: 65px;
+            min-width: 22px;
         }
         .trake-row input[type="text"] {
             flex: 1;
-            padding: 8px 12px;
+            padding: 5px 8px;
             background: #0f172a;
             border: 1px solid #334155;
             color: white;
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 12px;
         }
+        .trake-query-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 8px;
+        }
+        .dres-login-top {
+            margin: 0 0 10px 0;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 6px 10px;
+        }
+        .dres-login-top > summary {
+            cursor: pointer;
+            color: #93c5fd;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .dres-login-top-fields {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .dres-login-top-fields input,
+        .dres-login-top-fields select {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            border-radius: 4px;
+            padding: 5px 8px;
+            font-size: 12px;
+        }
+        .dres-login-top-fields input[type="text"],
+        .dres-login-top-fields input[type="password"] { width: 150px; }
+        .dres-login-top-fields #dresBaseUrl { width: 280px; }
+        .dres-login-top-fields button {
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .inspector-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .btn-find-similar {
+            flex: 1;
+            background: #7c3aed;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 7px 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-find-similar:hover { background: #6d28d9; }
+        .submit-type-badge { font-size: 11px; color: #38bdf8; margin: 4px 0 0; }
+        .submit-type-selector {
+            display: flex;
+            gap: 12px;
+            margin: 4px 0 2px;
+        }
+        .submit-type-selector label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #cbd5e1;
+            cursor: pointer;
+        }
+        .submit-type-selector input[type="radio"] {
+            cursor: pointer;
+        }
+        .trake-starts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .trake-starts-grid label {
+            display: block;
+            font-size: 10px;
+            color: #64748b;
+            margin-bottom: 2px;
+        }
+        #trakeActionsBar.hidden-trake { display: none; }
+        #vqaAnswerBox.hidden-trake { display: none; }
+        #kisQaTimes.hidden-trake { display: none; }
+        #trakeSubmitTimes.hidden-trake { display: none; }
 
         /* ============ Lookup drop-zone ============ */
         .drop-zone {
@@ -120,11 +218,36 @@
 
         /* ============ TraKE action bar ============ */
         .trake-actions-bar {
-            display: none;
+            display: flex;
             gap: 8px;
-            margin-top: 5px;
+            margin-top: 8px;
             align-items: center;
         }
+        .trake-actions-bar .trake-action-btn { flex: 1; }
+        .trake-queue-panel {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            display: none;
+        }
+        .trake-queue-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            border-bottom: 1px dashed #334155;
+        }
+        #dresSubmitPanel input, #dresSubmitPanel select {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 6px;
+            padding: 6px 8px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        #dresSubmitPanel summary { cursor: pointer; }
         .trake-action-btn {
             padding: 6px 12px;
             border-radius: 4px;
@@ -163,16 +286,17 @@
             font-size: 0.85rem;
         }
 
-        /* ============ Gallery ============ */
+        /* ============ Gallery (bổ sung style.css: 4 cột, skip paint offscreen) ============ */
         .gallery {
             display: grid;
-            grid-template-columns: repeat(4, 1fr) !important;
-            gap: 12px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
         }
-        .image-card {
-            position: relative;
-            content-visibility: auto; /* Tối ưu render cho danh sách dài */
-            contain-intrinsic-size: 150px;
+        @media (max-width: 1200px) {
+            .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        @media (max-width: 800px) {
+            .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         .image-card.trake-locked {
             border: 2px solid #10b981 !important;
@@ -252,28 +376,44 @@
 </head>
 <body>
     <div class="container">
+        <!-- TẠM ẨN: đăng nhập DRES API — vẫn để trong DOM (đừng xoá) để không
+             hỏng các đoạn JS phía dưới đang tham chiếu tới các input này, chỉ ẩn
+             hiển thị. Muốn bật lại: xoá style="display:none;" ở dòng <details> này. -->
+        <details class="dres-login-top" id="dresLoginDetails" style="display:none;">
+            <summary>DRES login — đầu trang (mở/đóng)</summary>
+            <div class="dres-login-top-fields">
+                <input type="text" id="dresBaseUrl" placeholder="API Base URL" value="https://eventretrieval.oj.io.vn/api/v2" />
+                <input type="text" id="dresUsername" placeholder="Username" />
+                <input type="password" id="dresPassword" placeholder="Password" />
+                <button type="button" id="dresLoginBtn">Đăng nhập</button>
+                <select id="dresEvalSelect" style="display:none; min-width:180px;"></select>
+                <span id="dresLoginStatus" style="font-size:11px; color:#94a3b8;">Login 1 lần cho mọi tab</span>
+            </div>
+        </details>
         <div class="top-search-container">
             <div class="search-bar-box" id="singleSearchBox">
                 <input type="text" id="queryInput" placeholder="Nhập từ khóa truy vấn tại đây (vd: a bird)..." />
-                <button id="searchBtn">🔍 SEARCH</button>
+                <button id="searchBtn">SEARCH</button>
             </div>
 
             <div class="lookup-image-box" id="lookupBox">
                 <div class="drop-zone" id="dropZone" tabindex="0">
-                    <p>📂 Kéo thả ảnh, <strong>dán (Ctrl+V)</strong> hoặc <strong>bấm để chọn ảnh</strong> tra cứu metadata</p>
+                    <p>Kéo thả ảnh, <strong>dán (Ctrl+V)</strong> hoặc <strong>bấm để chọn ảnh</strong> tra cứu metadata</p>
                     <input type="file" id="lookupImageInput" accept="image/*" style="display: none;" />
                     <img id="lookupPreviewImg" src="" alt="Preview Image" />
                 </div>
-                <button id="searchLookupImgBtn" style="padding: 8px; background: #4f46e5; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🔎 TRA CỨU KEYFRAME</button>
+                <button id="searchLookupImgBtn" style="padding: 8px; background: #4f46e5; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">TRA CỨU KEYFRAME</button>
+                <p style="font-size:11px;color:#64748b;margin:4px 0 0;">Upload ảnh ngoài rồi tra cứu keyframe gần giống nhất (CLIP).</p>
             </div>
 
             <div class="trake-inputs-container" id="trakeBox">
-                <div class="trake-row"><label>Context:</label><input type="text" id="trakeContext" placeholder="Bối cảnh chung (tùy chọn)..." /></div>
-                <div class="trake-row"><label>E1:</label><input type="text" id="trakeInput1" placeholder="Sự kiện 1..." /></div>
-                <div class="trake-row"><label>E2:</label><input type="text" id="trakeInput2" placeholder="Sự kiện 2..." /></div>
-                <div class="trake-row"><label>E3:</label><input type="text" id="trakeInput3" placeholder="Sự kiện 3..." /></div>
-                <div class="trake-row"><label>E4:</label><input type="text" id="trakeInput4" placeholder="Sự kiện 4..." /></div>
-                <button id="searchTrakeBtn" style="margin-top: 4px; padding: 10px; background: #2563eb; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🚀 TÌM KIẾM CHUỖI TraKE</button>
+                <div class="trake-query-grid">
+                    <div class="trake-row"><label>E1</label><input type="text" id="trakeInput1" placeholder="Mốc 1..." /></div>
+                    <div class="trake-row"><label>E2</label><input type="text" id="trakeInput2" placeholder="Mốc 2..." /></div>
+                    <div class="trake-row"><label>E3</label><input type="text" id="trakeInput3" placeholder="Mốc 3..." /></div>
+                    <div class="trake-row"><label>E4</label><input type="text" id="trakeInput4" placeholder="Mốc 4..." /></div>
+                </div>
+                <button id="searchTrakeBtn" style="margin-top: 4px; padding: 8px; background: #2563eb; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">TÌM KIẾM TraKE (đủ 4 mốc)</button>
             </div>
         </div>
 
@@ -281,32 +421,27 @@
             <div class="left-content">
                 <div class="feature-tabs">
                     <button class="tab-btn active" data-mode="semantic">Semantic</button>
-                    <button class="tab-btn" data-mode="lookup">🔎 Tra cứu ảnh</button>
+                    <button class="tab-btn" data-mode="lookup">Tra cứu ảnh</button>
                     <button class="tab-btn" data-mode="asr">ASR</button>
-                    <button class="tab-btn" data-mode="semantic+asr">semantic+asr</button>
-                    <button class="tab-btn" data-mode="semantic+ocr">semantic+ocr</button>
+                    <button class="tab-btn" data-mode="semantic+asr" style="display:none;">semantic+asr</button>
+                    <button class="tab-btn" data-mode="semantic+ocr" style="display:none;">semantic+ocr</button>
                     <button class="tab-btn" data-mode="vqa">VQA (Kết hợp)</button>
                     <button class="tab-btn" data-mode="trake">TraKE</button>
-                    <button class="tab-btn" id="rocchioToggleBtn" data-mode="rocchio">🎯 Rocchio</button>
+                    <button class="tab-btn" id="rocchioToggleBtn" data-mode="rocchio">Rocchio</button>
 
                     <div class="tools-strip">
-                        <input type="text" id="videoFilterInput" placeholder="🎬 Lọc video (L21,L22)" title="Lọc kết quả theo prefix video" />
+                        <input type="text" id="videoFilterInput" placeholder="Lọc video (L21,L22)" title="Lọc kết quả theo prefix video" />
                         <input type="checkbox" id="autoTranslateCheckbox" style="width:15px; height:15px; cursor:pointer;" />
                         <label for="autoTranslateCheckbox">🌐 VI→EN</label>
-                        <button class="tab-btn clear-btn" id="clearAllBtn">🧹 Clear</button>
+                        <button class="tab-btn clear-btn" id="clearAllBtn">Clear</button>
                     </div>
                 </div>
 
-                <div class="trake-actions-bar" id="trakeActionsBar">
-                    <button class="trake-action-btn btn-confirm-trake" id="confirmTrakeFrameBtn">✔️ Xác nhận Frame</button>
-                    <button class="trake-action-btn btn-back-trake" id="backTrakeFrameBtn">↩️ Back (Hủy frame cuối)</button>
-                </div>
-
                 <div class="rocchio-action-bar" id="rocchioActionBar">
-                    <span style="font-size:12px; color:#a78bfa;">🎯 Rocchio:</span>
+                    <span style="font-size:12px; color:#a78bfa;">Rocchio:</span>
                     <span id="rocchioStats" style="font-size:11px; color:#64748b;">D+=0 D-=0</span>
-                    <button class="btn-rocchio-search" id="rocchioSearchBtn">🔁 Tìm lại theo phản hồi</button>
-                    <button class="btn-rocchio-reset" id="rocchioResetBtn">♻️ Reset</button>
+                    <button class="btn-rocchio-search" id="rocchioSearchBtn">Tìm lại theo phản hồi</button>
+                    <button class="btn-rocchio-reset" id="rocchioResetBtn">Reset</button>
                 </div>
 
                 <div class="status-bar" id="statusBar">Đang ở chế độ Semantic Search.</div>
@@ -314,41 +449,86 @@
             </div>
 
             <div class="right-sidebar" id="detailSidebar">
-                <h3 class="sidebar-title">🎥 KEYFRAME INSPECTOR</h3>
+                <h3 class="sidebar-title">KEYFRAME INSPECTOR</h3>
                 <div class="preview-box">
                     <img id="detailImg" src="" alt="Preview" style="display:none;" />
                     <div id="previewPlaceholder" class="placeholder-text">Bấm vào một Keyframe bên trái để xem</div>
                 </div>
                 <div class="video-box">
-                    <video id="detailVideo" controls><source src="" type="video/mp4"></video>
+                    <video id="detailVideo" controls preload="none"><source src="" type="video/mp4"></video>
                 </div>
                 <div class="meta-info-list">
                     <p><strong>Frame ID:</strong> <span id="metaFrameId">#-----</span></p>
                     <p><strong>Time:</strong> <span id="metaTime">00:00:00:000</span></p>
                     <p><strong>Path:</strong> <span id="metaPath">---</span></p>
                 </div>
+                <div class="inspector-actions">
+                    <button type="button" class="btn-find-similar" id="findSimilarBtn">Find Similar</button>
+                </div>
 
                 <div class="timeline-context-box" style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
-                    <h4 style="font-size: 0.85rem; color: #60a5fa; margin-bottom: 8px;">🎞️ KHUNG HÌNH LÂN CẬN (TIMELINE)</h4>
+                    <h4 style="font-size: 0.85rem; color: #60a5fa; margin-bottom: 8px;">KHUNG HÌNH LÂN CẬN (TIMELINE)</h4>
                     <div id="timelineFilmstrip" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px;">
                         <span style="font-size: 0.75rem; color: #64748b;">(Chọn một frame bên trái để tải timeline lân cận)</span>
                     </div>
+                    <!-- Xác nhận/Back TraKE nằm ngay đây: có thể chốt frame từ TIMELINE
+                         (không chỉ từ lưới kết quả top-K), và hoạt động ở BẤT KỲ mode nào
+                         (semantic, lookup ảnh, asr...) chứ không chỉ khi đang ở tab TraKE. -->
+                    <div class="trake-actions-bar" id="trakeActionsBar">
+                        <button class="trake-action-btn btn-confirm-trake" id="confirmTrakeFrameBtn">Thêm vào TraKE</button>
+                        <button class="trake-action-btn btn-back-trake" id="backTrakeFrameBtn">Back</button>
+                    </div>
+                    <div id="trakeQueuePanel" class="trake-queue-panel"></div>
                 </div>
 
-                <div class="api-submit-box" style="margin-top: 15px;">
+                <div class="api-submit-box" id="dresSubmitPanel" style="margin-top: 15px;">
                     <h4>TẠO FILE CSV SUBMISSION</h4>
 
-                    <div class="vqa-answer-container" id="vqaAnswerBox">
-                        <label>ĐÁP ÁN VQA (NẾU CÓ KẾT HỢP):</label>
+                    <!-- TẠM ẨN: bộ chọn loại nộp bài KIS/QA/TRAKE. Vẫn giữ trong
+                         DOM (không xoá) để JS (resolveSubmissionType, v.v.) không bị
+                         lỗi — chỉ ẩn hiển thị. Muốn bật lại: xoá style="display:none;"
+                         ở div bên dưới. -->
+                    <div class="submit-type-selector" id="submitTypeSelector" style="display:none;">
+                        <label><input type="radio" name="dresSubmitType" id="submitTypeKIS" value="KIS" checked /> KIS</label>
+                        <label><input type="radio" name="dresSubmitType" id="submitTypeQA" value="QA" /> QA</label>
+                        <label><input type="radio" name="dresSubmitType" id="submitTypeTRAKE" value="TRAKE" /> TRAKE</label>
+                    </div>
+                    <p class="submit-type-badge" id="submitTypeBadge" style="display:none;">Loại: KIS — video + start/end</p>
+
+                    <div class="vqa-answer-container" id="vqaAnswerBox" style="margin-top:8px;">
+                        <label>ĐÁP ÁN VQA (NẾU CÓ KẾT HỢP — chỉ dùng khi chọn <strong>QA</strong> ở trên):</label>
                         <input type="text" id="vqaInputVal" placeholder="Nhập đáp án..." />
                     </div>
 
-                    <div id="trakeQueueInfo" style="font-size: 0.75rem; color: #38bdf8; margin-bottom: 8px; display: none;">
-                        📌 Đã chọn cho TraKE: <span id="trakeCount">0</span>/4 khung hình
-                    </div>
-
                     <input type="text" id="csvFilenameInput" placeholder="Nhập tên file (vd: query-p1-11-kis)..." style="margin-top: 8px;" />
-                    <button id="saveCsvBtn">💾 TẠO KEYFRAME (LƯU CSV)</button>
+                    <button id="saveCsvBtn">TẠO KEYFRAME (LƯU CSV)</button>
+
+                    <!-- TẠM ẨN: nộp bài trực tiếp qua DRES API. Vẫn giữ nguyên các
+                         input/nút trong DOM (không xoá) để không hỏng JS đang tham
+                         chiếu tới #submitVideoName, #submitDresBtn, v.v. — chỉ ẩn
+                         hiển thị. Muốn bật lại: xoá style="display:none;" ở dòng
+                         <div id="dresApiSection" ...> ngay dưới đây. -->
+                    <div id="dresApiSection" style="display:none; margin-top:12px; padding-top:10px; border-top:1px dashed #334155;">
+                        <p style="font-size:0.72rem; color:#64748b; margin:0 0 6px;">Nộp bài (DRES API):</p>
+                        <input type="text" id="submitVideoName" placeholder="Video ID (tự động điền khi chọn frame)" />
+                        <div id="kisQaTimes" style="display:flex; gap:6px;">
+                            <input type="text" id="submitStartTime" placeholder="Start (vd: 11:14:299, 6'22, 06:22, ms)" />
+                            <input type="text" id="submitEndTime" placeholder="End (vd: 11:14:299 hoặc trùng Start)" />
+                        </div>
+                        <div id="trakeSubmitTimes" class="hidden-trake">
+                            <p style="font-size:0.68rem; color:#94a3b8; margin:6px 0 0;">TraKE: 4 mốc start — mỗi mốc gửi start = end (như form AIC25).</p>
+                            <div class="trake-starts-grid">
+                                <div><label>#1 start=end</label><input type="text" id="trakeStart1" placeholder="6'22" /></div>
+                                <div><label>#2 start=end</label><input type="text" id="trakeStart2" placeholder="6'31" /></div>
+                                <div><label>#3 start=end</label><input type="text" id="trakeStart3" placeholder="6'40" /></div>
+                                <div><label>#4 start=end</label><input type="text" id="trakeStart4" placeholder="6'58" /></div>
+                            </div>
+                        </div>
+                        <p style="font-size:0.68rem; color:#64748b; margin:4px 0 0;">11:14:299 / 6'22 / 06:22 / giây → tự đổi ms (11:14:299 = 674299 ms, giữ nguyên mili giây).</p>
+
+                        <button id="submitDresBtn" style="margin-top:10px; width:100%; background:#16a34a; color:#fff; border:none; border-radius:4px; padding:10px; font-weight:bold; cursor:pointer;">NỘP BÀI</button>
+                        <div id="dresSubmitStatus" style="font-size:0.75rem; margin-top:6px;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -392,11 +572,12 @@
 
         const vqaInputVal            = document.getElementById('vqaInputVal');
         const clearAllBtn            = document.getElementById('clearAllBtn');
-        const trakeQueueInfo         = document.getElementById('trakeQueueInfo');
-        const trakeCount             = document.getElementById('trakeCount');
-        const trakeActionsBar        = document.getElementById('trakeActionsBar');
+        const trakeQueuePanel        = document.getElementById('trakeQueuePanel');
         const confirmTrakeFrameBtn   = document.getElementById('confirmTrakeFrameBtn');
         const backTrakeFrameBtn      = document.getElementById('backTrakeFrameBtn');
+        const submitVideoNameInput   = document.getElementById('submitVideoName');
+        const submitStartTimeInput   = document.getElementById('submitStartTime');
+        const submitEndTimeInput     = document.getElementById('submitEndTime');
 
         const rocchioToggleBtn       = document.getElementById('rocchioToggleBtn');
         const rocchioActionBar       = document.getElementById('rocchioActionBar');
@@ -413,19 +594,31 @@
         const seqVideoName           = document.getElementById('seqVideoName');
         const seqFrameId             = document.getElementById('seqFrameId');
         const cardTemplate           = document.getElementById('cardTemplate');
-        let currentGalleryItems      = [];   // ⚡ cache dữ liệu gallery hiện tại cho event delegation
-        let currentSearchController  = null; // ⚡ huỷ request search cũ khi có request mới hơn
+        let currentGalleryItems      = [];   // cache dữ liệu gallery hiện tại cho event delegation
+        let currentSearchController  = null; // huỷ request search cũ khi có request mới hơn
 
         let primaryMode         = 'semantic';
         let isVqaCombined       = false;
         let isRocchioMode       = false;
         let selectedLookupFile  = null;
-        let trakeSelectedFrames = [];
+        let trakeSelectedFrames = [];      // ["12345", "67890", ...] — giữ để tương thích CSV cũ
+        let trakeQueueDetails   = [];      // [{video_name, frame_id, pts_time}, ...] — dùng để build payload DRES
         let currentSelectedCardItem = null;
+        let currentSelectedFrameData = null; // {video_name, frame_id, pts_time} — frame đang chọn, từ BẤT KỲ nguồn nào
+                                              // (lưới kết quả, timeline lân cận, hay kết quả tra cứu ảnh)
+
+        // Loại nộp bài (KIS/QA/TRAKE) giờ CHỌN THỦ CÔNG bằng radio, không còn tự
+        // suy luận theo tab/hàng đợi nữa — áp dụng như nhau ở MỌI tab tính năng
+        // (semantic, asr, trake, tra cứu ảnh, semantic+asr, semantic+ocr...).
+        let dresSubmissionType = 'KIS';
 
         let rocchioPositivePaths = [];
         let rocchioNegativePaths = [];
         let lastQueryVector      = null;
+
+        // --- Trạng thái phiên đăng nhập DRES (Ban tổ chức) ---
+        let dresSessionId    = null;
+        let dresEvaluationId = null;
 
         async function translateIfNeeded(text) {
             if (!text || !autoTranslateCheckbox.checked) return text;
@@ -459,16 +652,12 @@
             singleSearchBox.style.display = 'none';
             lookupBox.style.display       = 'none';
             trakeBox.style.display        = 'none';
-            trakeQueueInfo.style.display  = 'none';
-            trakeActionsBar.style.display = 'none';
 
             if (primaryMode === 'lookup') {
                 lookupBox.style.display = 'flex';
                 dropZone.focus();
             } else if (primaryMode === 'trake') {
                 trakeBox.style.display        = 'flex';
-                trakeQueueInfo.style.display  = 'block';
-                trakeActionsBar.style.display = 'flex';
             } else {
                 singleSearchBox.style.display = 'flex';
                 const ph = tabConfigs[primaryMode]?.placeholder;
@@ -477,12 +666,58 @@
 
             let modeDesc = primaryMode.toUpperCase();
             if (isVqaCombined) modeDesc += ' + VQA';
-            if (isRocchioMode) modeDesc += ' + 🎯ROCCHIO';
-            statusBar.textContent = `🚀 Chế độ: ${modeDesc}`;
+            if (isRocchioMode) modeDesc += ' + ROCCHIO';
+            statusBar.textContent = `Chế độ: ${modeDesc}`;
 
             rocchioActionBar.classList.toggle('visible', isRocchioMode);
             resultGallery.classList.toggle('rocchio-mode', isRocchioMode);
+            syncSubmitFormVisibility();
         }
+
+        function isTrakeSubmitActive() {
+            // Nộp dạng TraKE hay không giờ do người dùng CHỌN THỦ CÔNG ở radio
+            // (không còn suy ra từ primaryMode/trakeQueueDetails nữa).
+            return dresSubmissionType === 'TRAKE';
+        }
+
+        function syncSubmitFormVisibility() {
+            const trakeOn = isTrakeSubmitActive();
+            const kisTimes = document.getElementById('kisQaTimes');
+            const trakeTimes = document.getElementById('trakeSubmitTimes');
+            // Ô ĐÁP ÁN Q&A/VQA luôn hiển thị + luôn bật ở mọi tab/loại nộp bài —
+            // nếu để trống thì lúc nộp sẽ tự coi là truy vấn bình thường (KIS).
+            if (kisTimes) kisTimes.classList.toggle('hidden-trake', trakeOn);
+            if (trakeTimes) trakeTimes.classList.toggle('hidden-trake', !trakeOn);
+            updateSubmitTypeBadge();
+        }
+
+        function updateSubmitTypeBadge() {
+            const badge = document.getElementById('submitTypeBadge');
+            if (!badge) return;
+            const effectiveType = resolveSubmissionType();
+            if (dresSubmissionType === 'TRAKE') {
+                badge.textContent = 'Loại: TRAKE — 4 mốc start=end (đã chọn thủ công)';
+            } else if (dresSubmissionType === 'QA') {
+                badge.textContent = effectiveType === 'QA'
+                    ? 'Loại: QA / VQA — có đáp án (đã chọn thủ công)'
+                    : 'Loại: QA đã chọn nhưng chưa điền đáp án → tạm nộp như KIS';
+            } else {
+                badge.textContent = 'Loại: KIS — video + start/end (đã chọn thủ công)';
+            }
+        }
+
+        document.querySelectorAll('input[name="dresSubmitType"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.checked) {
+                    dresSubmissionType = radio.value;
+                    syncSubmitFormVisibility();
+                    // Nếu vừa chuyển sang loại TRAKE mà hàng đợi đã có sẵn frame
+                    // (gom từ trước khi chọn loại này) → tự fill luôn 4 ô mốc thời
+                    // gian, không cần confirm lại từ đầu.
+                    if (dresSubmissionType === 'TRAKE') renderTrakeQueuePanel();
+                }
+            });
+        });
 
         document.querySelectorAll('.tab-btn:not(.clear-btn):not(#rocchioToggleBtn)').forEach(button => {
             button.addEventListener('click', () => {
@@ -490,6 +725,9 @@
                 if (!mode) return;
 
                 if (mode === 'vqa') {
+                    // Toggle "VQA (Kết hợp)" cho luồng CSV dự phòng — độc lập với
+                    // loại nộp bài DRES (radio KIS/QA/TRAKE ở panel bên phải), nên
+                    // KHÔNG còn bị chặn hay tự xoá đáp án khi đang ở tab TraKE nữa.
                     isVqaCombined = !isVqaCombined;
                     button.classList.toggle('vqa-active', isVqaCombined);
                 } else {
@@ -497,12 +735,9 @@
                         .forEach(b => b.classList.remove('active'));
                     button.classList.add('active');
                     primaryMode = mode;
-
-                    if (primaryMode === 'trake') {
-                        trakeSelectedFrames   = [];
-                        trakeCount.textContent = '0';
-                        currentSelectedCardItem = null;
-                    }
+                    // Hàng đợi TraKE độc lập với tab — gom frame từ Semantic/Lookup/ASR rồi nộp TraKE.
+                    // Loại nộp bài (KIS/QA/TRAKE) và ô đáp án VQA cũng độc lập với tab — đổi tab
+                    // KHÔNG còn tự xoá đáp án VQA hay ép loại nộp bài nữa.
                 }
                 updateUIState();
             });
@@ -532,15 +767,15 @@
                 c.classList.remove('rocchio-positive', 'rocchio-negative');
             });
             updateRocchioStats();
-            statusBar.textContent = '🎯 Rocchio đã reset. D+/D− đã xoá.';
+            statusBar.textContent = 'Rocchio đã reset. D+/D− đã xoá.';
         });
 
         async function performRocchioSearch() {
             if (rocchioPositivePaths.length === 0 && rocchioNegativePaths.length === 0) {
-                statusBar.textContent = '⚠️ Rocchio: chưa chọn D+ hoặc D−. Bấm +/− trên ảnh trước.';
+                statusBar.textContent = 'Rocchio: chưa chọn D+ hoặc D−. Bấm +/− trên ảnh trước.';
                 return;
             }
-            statusBar.textContent = '⏳ Rocchio: đang tính lại kết quả...';
+            statusBar.textContent = 'Rocchio: đang tính lại kết quả...';
             const t0 = performance.now();
             try {
                 const body = {
@@ -567,11 +802,11 @@
                     const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
                     const st = data.stats || {};
                     statusBar.textContent =
-                        `🎯 Rocchio xong ${elapsed}s — ${data.results.length} kết quả ` +
+                        `Rocchio xong ${elapsed}s — ${data.results.length} kết quả ` +
                         `(D+ matched ${st.positive_found ?? '?'}, D− matched ${st.negative_found ?? '?'})`;
                 }
             } catch (e) {
-                statusBar.textContent = '❌ Lỗi Rocchio search.';
+                statusBar.textContent = 'Lỗi Rocchio search.';
             }
         }
 
@@ -579,15 +814,32 @@
             primaryMode             = 'semantic';
             isVqaCombined           = false;
             isRocchioMode           = false;
+            dresSubmissionType      = 'KIS';
             rocchioPositivePaths    = [];
             rocchioNegativePaths    = [];
             lastQueryVector         = null;
             trakeSelectedFrames     = [];
-            trakeCount.textContent  = '0';
+            trakeQueueDetails       = [];
             currentSelectedCardItem = null;
+            currentSelectedFrameData = null;
             seqVideoName.value      = '';
             seqFrameId.value        = '';
             vqaInputVal.value       = '';
+            submitVideoNameInput.value = '';
+            submitStartTimeInput.value = '';
+            submitEndTimeInput.value   = '';
+            const kisRadio = document.getElementById('submitTypeKIS');
+            if (kisRadio) kisRadio.checked = true;
+            ['trakeInput1','trakeInput2','trakeInput3','trakeInput4'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            ['trakeStart1','trakeStart2','trakeStart3','trakeStart4'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            queryInput.value = '';
+            renderTrakeQueuePanel();
             lookupPreviewImg.style.display = 'none';
             selectedLookupFile      = null;
             document.getElementById('timelineFilmstrip').innerHTML =
@@ -631,7 +883,7 @@
                     if (imageFile && lookupBox.style.display === 'flex') {
                         e.preventDefault();
                         handleSelectedImage(imageFile);
-                        statusBar.textContent = '📋 Đã dán ảnh (Ctrl+V) vào phần Tra cứu!';
+                        statusBar.textContent = 'Đã dán ảnh (Ctrl+V) vào phần Tra cứu!';
                     }
                     break;
                 }
@@ -651,6 +903,147 @@
         function formatSecondsToShort(seconds) {
             seconds = Math.max(0, Number(seconds) || 0);
             return `${String(Math.floor(seconds / 60)).padStart(2,'0')}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
+        }
+
+        // Định dạng ĐẦY ĐỦ mili giây — dùng để tự động điền Start/End (và các
+        // mốc TraKE) trong panel nộp bài, để KHÔNG bị mất phần mili giây như
+        // formatSecondsToShort() (mm:ss) ở trên. Trả về "mm:ss:mmm", ví dụ
+        // pts_time = 364.166 -> "06:04:166" (giống hệt phần mm:ss:mmm hiển thị ở
+        // Keyframe Inspector, chỉ bỏ phần giờ "hh:" nếu là 00).
+        function formatSecondsToPreciseTime(seconds) {
+            seconds = Math.max(0, Number(seconds) || 0);
+            const mm  = Math.floor(seconds / 60);
+            const ss  = Math.floor(seconds % 60);
+            const mmm = Math.round((seconds % 1) * 1000);
+            return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}:${String(mmm).padStart(3, '0')}`;
+        }
+
+        // Parse thời gian linh hoạt do người dùng nhập (hoặc tự động điền) ->
+        // mili giây. Hỗ trợ, THEO THỨ TỰ ƯU TIÊN:
+        //   1) "6'22" hoặc "6'22s"        -> 6 phút 22 giây
+        //   2) "hh:mm:ss:mmm" (4 nhóm)     -> ưu tiên cao nhất, giữ NGUYÊN mili giây
+        //      vd "00:06:04:166" (giống hệt Time hiển thị ở Keyframe Inspector)
+        //   3) "mm:ss:mmm" (3 nhóm, nhóm cuối ĐÚNG 3 chữ số) -> cũng ưu tiên giữ
+        //      nguyên mili giây, vd "11:14:299" hoặc "6:04:166"
+        //   4) "hh:mm:ss[.mmm]" (3 nhóm, nhóm cuối 1-2 chữ số, có thể có phần thập
+        //      phân) -> kiểu cũ, vd "01:06:04"
+        //   5) "mm:ss[.mmm]" (2 nhóm)      -> vd "06:22" hoặc "06:22.5"
+        //   6) số giây thuần (vd "382.5"), hoặc số ms thuần nếu số đã đủ lớn
+        //      (>= 10000 được coi là ms sẵn, để không đổi trùng lần 2 khi người
+        //      dùng dán thẳng số ms).
+        function parseTimeInputToMs(raw) {
+            if (raw === null || raw === undefined) return null;
+            const text = String(raw).trim().toLowerCase();
+            if (!text) return null;
+
+            // 1) Dạng phút'giây, ví dụ 6'22 hoặc 6'22s
+            let m = text.match(/^(\d+)'(\d+(?:\.\d+)?)s?$/);
+            if (m) {
+                const min = parseInt(m[1], 10);
+                const sec = parseFloat(m[2]);
+                return Math.round((min * 60 + sec) * 1000);
+            }
+
+            // 2) hh:mm:ss:mmm (4 nhóm, số nguyên) — giữ nguyên mili giây.
+            m = text.match(/^(\d+):(\d{1,2}):(\d{1,2}):(\d{1,3})$/);
+            if (m) {
+                const hh  = parseInt(m[1], 10);
+                const mm  = parseInt(m[2], 10);
+                const ss  = parseInt(m[3], 10);
+                const mmm = parseInt(m[4].padEnd(3, '0'), 10);
+                return (hh * 3600 + mm * 60 + ss) * 1000 + mmm;
+            }
+
+            // 3 nhóm: phân biệt "mm:ss:mmm" (ưu tiên, giữ mili giây) với kiểu cũ
+            // "hh:mm:ss[.mmm]" bằng ĐỘ DÀI của nhóm cuối — mili giây luôn viết đủ
+            // 3 chữ số (000-999), còn giây trong hh:mm:ss chỉ 1-2 chữ số.
+            m = text.match(/^(\d+):(\d{1,2}):(\d{1,3})$/);
+            if (m) {
+                const a = parseInt(m[1], 10);
+                const b = parseInt(m[2], 10);
+                const cRaw = m[3];
+                if (cRaw.length === 3) {
+                    // 3) mm:ss:mmm — vd "11:14:299" hoặc "6:04:166"
+                    const mmm = parseInt(cRaw, 10);
+                    return (a * 60 + b) * 1000 + mmm;
+                }
+                // 4) hh:mm:ss (kiểu cũ, nhóm cuối 1-2 chữ số)
+                const ss = parseInt(cRaw, 10);
+                return (a * 3600 + b * 60 + ss) * 1000;
+            }
+
+            // 4b) hh:mm:ss.mmm (nhóm cuối có phần thập phân tường minh)
+            m = text.match(/^(\d+):(\d{1,2}):(\d{1,2}\.\d+)$/);
+            if (m) {
+                const hh = parseInt(m[1], 10);
+                const mm = parseInt(m[2], 10);
+                const ss = parseFloat(m[3]);
+                return Math.round((hh * 3600 + mm * 60 + ss) * 1000);
+            }
+
+            // 5) mm:ss[.mmm] (2 nhóm)
+            m = text.match(/^(\d+):(\d{1,2}(?:\.\d+)?)$/);
+            if (m) {
+                const mm = parseInt(m[1], 10);
+                const ss = parseFloat(m[2]);
+                return Math.round((mm * 60 + ss) * 1000);
+            }
+
+            // 6) Số thuần: nếu đủ lớn (>=10000) coi như đã là ms, ngược lại coi là giây
+            const num = parseFloat(text);
+            if (!isNaN(num)) {
+                return num >= 10000 ? Math.round(num) : Math.round(num * 1000);
+            }
+            return null;
+        }
+
+        // Khi người dùng chọn 1 frame (từ lưới kết quả, timeline, hay lookup ảnh),
+        // chỉ tự động điền Video ID. Start VÀ End giờ NHẬP TAY HOÀN TOÀN — không
+        // còn tự lấy pts_time đổ vào Start nữa; người dùng tự xem "Time:" ở
+        // Keyframe Inspector rồi gõ tay cả 2 ô Start/End (hoặc 4 mốc TraKE).
+        function updateSubmitPanelFromFrame(frameData) {
+            if (!frameData) return;
+            submitVideoNameInput.value = frameData.video_name || '';
+            updateSubmitTypeBadge();
+        }
+
+        function renderTrakeQueuePanel() {
+            trakeCountBadgeText();
+            // Riêng TraKE: khi loại nộp bài đang chọn là TRAKE, xác nhận frame vào
+            // hàng đợi sẽ TỰ ĐỘNG điền mốc thời gian (mm:ss:mmm, giữ nguyên mili
+            // giây) vào 4 ô trakeStart1-4 tương ứng. Ô Start/End của KIS/QA thì vẫn
+            // nhập tay hoàn toàn như trước, không bị ảnh hưởng.
+            if (dresSubmissionType === 'TRAKE') {
+                const slots = ['trakeStart1', 'trakeStart2', 'trakeStart3', 'trakeStart4'];
+                slots.forEach((id, i) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.value = trakeQueueDetails[i] ? formatSecondsToPreciseTime(trakeQueueDetails[i].pts_time) : '';
+                });
+            }
+            if (trakeQueueDetails.length > 0) {
+                submitVideoNameInput.value = trakeQueueDetails[0].video_name || '';
+            }
+            if (trakeQueueDetails.length === 0) {
+                trakeQueuePanel.style.display = 'none';
+                trakeQueuePanel.innerHTML = '';
+                syncSubmitFormVisibility();
+                return;
+            }
+            trakeQueuePanel.style.display = 'block';
+            trakeQueuePanel.innerHTML =
+                `TraKE (${trakeQueueDetails.length}/4) — video: <b>${trakeQueueDetails[0].video_name}</b><br>` +
+                trakeQueueDetails.map((f, i) =>
+                    `<div class="trake-queue-item"><span>#${i + 1} · frame ${f.frame_id}</span><span>${formatSecondsToPreciseTime(f.pts_time)} → start=end</span></div>`
+                ).join('');
+            syncSubmitFormVisibility();
+        }
+
+        // Giữ statusBar cập nhật gọn (thay cho span#trakeCount cũ đã bỏ)
+        function trakeCountBadgeText() {
+            if (trakeQueueDetails.length > 0) {
+                statusBar.textContent = `TraKE đã chốt ${trakeQueueDetails.length}/4 frame: [${trakeSelectedFrames.join(', ')}]`;
+            }
         }
 
         function getFilename(imagePath) {
@@ -676,7 +1069,7 @@
 
         async function loadTimelineFilmstrip(videoName, frameId) {
             const tc = document.getElementById('timelineFilmstrip');
-            tc.innerHTML = `<span style="font-size: 0.75rem; color: #38bdf8;">⏳ Đang tải timeline...</span>`;
+            tc.innerHTML = `<span style="font-size: 0.75rem; color: #38bdf8;">Đang tải timeline...</span>`;
             try {
                 const res  = await fetch(`${API_BASE}/api/search/sequential-frames?video_name=${encodeURIComponent(videoName)}&center_frame_id=${encodeURIComponent(frameId)}`);
                 const data = await res.json();
@@ -692,8 +1085,11 @@
                     const fragment = document.createDocumentFragment();
                     sorted.forEach(tItem => {
                         const img     = document.createElement('img');
-                        const tImgUrl = `${API_BASE}/api/image?path=${encodeURIComponent(tItem.image_path)}`;
+                        const tImgUrl = `${API_BASE}/api/image?path=${encodeURIComponent(tItem.image_path)}&w=240`;
+                        const tFullUrl = `${API_BASE}/api/image?path=${encodeURIComponent(tItem.image_path)}`;
                         img.src    = tImgUrl;
+                        img.loading = 'lazy';
+                        img.decoding = 'async';
                         img.style.cssText = 'height:55px;border-radius:4px;cursor:pointer;border:1px solid #334155;flex-shrink:0;';
                         const frameNum = parseInt(getFilename(tItem.image_path).split('.')[0], 10) || 0;
                         if (String(frameNum) === cleanCenter) {
@@ -703,7 +1099,7 @@
                         img.title = `Frame: ${tItem.frame_id} | Time: ${formatSecondsToShort(tItem.pts_time)}`;
                         img.addEventListener('click', () => {
                             previewPlaceholder.style.display = 'none';
-                            detailImg.src = tImgUrl;
+                            detailImg.src = tFullUrl;
                             detailImg.style.display = 'block';
                             document.getElementById('metaFrameId').textContent = `#${tItem.frame_id ?? '-----'}`;
                             document.getElementById('metaTime').textContent     = formatSecondsToTimecode(tItem.pts_time);
@@ -714,12 +1110,26 @@
                             tc.querySelectorAll('img').forEach(el => { el.style.borderWidth = '1px'; el.style.borderColor = '#334155'; });
                             img.style.borderWidth = '2.5px';
                             img.style.borderColor = '#60a5fa';
+
+                            // Chọn frame ngay từ TIMELINE — không bắt buộc phải có card
+                            // tương ứng đang hiển thị trong lưới kết quả top-K.
+                            currentSelectedCardItem = null;
+                            currentSelectedFrameData = {
+                                video_name: tItem.video_name,
+                                frame_id: String(tItem.frame_id ?? frameNum),
+                                pts_time: tItem.pts_time,
+                                image_path: tItem.image_path,
+                            };
+                            updateSubmitPanelFromFrame(currentSelectedFrameData);
+
                             document.querySelectorAll('.image-card').forEach(card => {
                                 const ci = card.querySelector('.card-info')?.textContent;
                                 if (ci === getFilename(tItem.image_path).replace(/\.[^/.]+$/, '')) {
                                     document.querySelectorAll('.image-card').forEach(c => { if (!c.classList.contains('trake-locked')) c.classList.remove('selected'); });
                                     card.classList.add('selected');
-                                    if (primaryMode === 'trake') currentSelectedCardItem = { cardElement: card, frameId: String(tItem.frame_id) };
+                                    // Nếu frame này cũng đang hiển thị trong lưới, gắn luôn
+                                    // cardElement để khi confirm sẽ tự khoá (trake-locked) card đó.
+                                    currentSelectedCardItem = { cardElement: card, frameId: String(tItem.frame_id ?? frameNum) };
                                 }
                             });
                         });
@@ -734,7 +1144,7 @@
             }
         }
 
-        // ⚡ Tối ưu render gallery: dùng <template> + cloneNode (không phải
+        // Tối ưu render gallery: dùng <template> + cloneNode (không phải
         // parse lại HTML string cho từng card) + DocumentFragment để giảm
         // reflow/repaint, thay vì set card.innerHTML = `...` mỗi lần.
         function renderGallery(results) {
@@ -745,7 +1155,7 @@
                 const card = cardTemplate.content.firstElementChild.cloneNode(true);
                 card.dataset.idx = idx;
 
-                const imgUrl   = `${API_BASE}/api/image?path=${encodeURIComponent(item.image_path)}`;
+                const imgUrl   = `${API_BASE}/api/image?path=${encodeURIComponent(item.image_path)}&w=360`;
                 const filename = getFilename(item.image_path);
                 const cleanId  = String(item.frame_id ?? '').replace('#', '').trim();
 
@@ -757,7 +1167,7 @@
                     else if (rocchioNegativePaths.includes(item.image_path)) card.classList.add('rocchio-negative');
                 }
 
-                card.querySelector('.score-badge').textContent = `🎯 ${item.score ?? 0}`;
+                card.querySelector('.score-badge').textContent = `${item.score ?? 0}`;
 
                 const img = card.querySelector('img');
                 img.src = imgUrl;
@@ -776,7 +1186,7 @@
             resultGallery.replaceChildren(fragment);
         }
 
-        // ⚡ Event delegation: 1 listener DUY NHẤT cho toàn bộ gallery thay vì
+        // Event delegation: 1 listener DUY NHẤT cho toàn bộ gallery thay vì
         // gắn 2-3 listener cho MỖI card (trước đây tạo lại ~150 listener mỗi
         // lần search 50 kết quả — vừa tốn CPU vừa tăng áp lực garbage collector).
         resultGallery.addEventListener('click', (e) => {
@@ -819,7 +1229,7 @@
                 return;
             }
 
-            if (primaryMode === 'trake' && trakeSelectedFrames.includes(String(item.frame_id ?? '').replace('#', '').trim())) return;
+            if (trakeSelectedFrames.includes(String(item.frame_id ?? '').replace('#', '').trim())) return;
 
             const imgUrl  = `${API_BASE}/api/image?path=${encodeURIComponent(item.image_path)}`;
             const cleanId = String(item.frame_id ?? '').replace('#', '').trim();
@@ -834,9 +1244,12 @@
 
             seekVideoToKeyframe(item);
 
-            if (primaryMode === 'trake') {
-                currentSelectedCardItem = { cardElement: card, frameId: cleanId };
-            }
+            // Cho phép chọn frame để nộp (KIS/QA/TraKE) ở BẤT KỲ mode nào —
+            // kể cả tab "Tra cứu ảnh" (lookup), không chỉ tab TraKE.
+            currentSelectedCardItem = { cardElement: card, frameId: cleanId };
+            currentSelectedFrameData = { video_name: item.video_name, frame_id: cleanId, pts_time: item.pts_time, image_path: item.image_path };
+            updateSubmitPanelFromFrame(currentSelectedFrameData);
+
             if (item.video_name && item.image_path) {
                 seqVideoName.value = item.video_name;
                 const fidVal       = getFilename(item.image_path).split('.')[0];
@@ -848,29 +1261,43 @@
         });
 
         confirmTrakeFrameBtn.addEventListener('click', () => {
-            if (!currentSelectedCardItem) { alert('Vui lòng bấm chọn một khung hình bên trái trước khi xác nhận!'); return; }
-            if (trakeSelectedFrames.length >= 4) { alert('Bạn đã chọn tối đa 4 khung hình!'); return; }
-            const { cardElement, frameId } = currentSelectedCardItem;
-            if (trakeSelectedFrames.includes(frameId)) { alert('Khung hình này đã được chọn, không được chọn trùng!'); return; }
-            trakeSelectedFrames.push(frameId);
-            trakeCount.textContent = trakeSelectedFrames.length;
-            cardElement.classList.remove('selected');
-            cardElement.classList.add('trake-locked');
-            currentSelectedCardItem = null;
-            statusBar.textContent = `⏱️ TraKE đã chốt: [${trakeSelectedFrames.join(', ')}]`;
+            // Hoạt động với frame chọn từ BẤT KỲ nguồn nào: lưới kết quả top-K,
+            // timeline khung hình lân cận, hoặc kết quả tra cứu ảnh — không còn
+            // bắt buộc phải đang ở tab TraKE.
+            if (!currentSelectedFrameData) { alert('Vui lòng bấm chọn một khung hình (lưới kết quả hoặc timeline) trước khi thêm vào TraKE!'); return; }
+            if (trakeQueueDetails.length >= 4) { alert('Bạn đã chọn tối đa 4 khung hình cho TraKE!'); return; }
+
+            const { video_name, frame_id, pts_time } = currentSelectedFrameData;
+            if (trakeSelectedFrames.includes(frame_id)) { alert('Khung hình này đã được chọn, không được chọn trùng!'); return; }
+            if (trakeQueueDetails.length > 0 && trakeQueueDetails[0].video_name !== video_name) {
+                alert(`Tất cả các frame TraKE phải cùng 1 video! (đang chốt cho video "${trakeQueueDetails[0].video_name}")`);
+                return;
+            }
+
+            trakeSelectedFrames.push(frame_id);
+            trakeQueueDetails.push({ video_name, frame_id, pts_time });
+
+            if (currentSelectedCardItem && currentSelectedCardItem.frameId === frame_id) {
+                currentSelectedCardItem.cardElement.classList.remove('selected');
+                currentSelectedCardItem.cardElement.classList.add('trake-locked');
+            }
+            currentSelectedCardItem  = null;
+            currentSelectedFrameData = null;
+            renderTrakeQueuePanel();
         });
 
         backTrakeFrameBtn.addEventListener('click', () => {
             if (trakeSelectedFrames.length === 0) { alert('Chưa có khung hình nào được xác nhận!'); return; }
             trakeSelectedFrames.pop();
-            trakeCount.textContent = trakeSelectedFrames.length;
+            trakeQueueDetails.pop();
             document.querySelectorAll('.image-card').forEach(card => card.classList.remove('trake-locked'));
-            statusBar.textContent = `⏱️ Đã hủy frame cuối. TraKE: [${trakeSelectedFrames.join(', ')}]`;
+            renderTrakeQueuePanel();
+            statusBar.textContent = `Đã hủy frame cuối. TraKE: [${trakeSelectedFrames.join(', ')}]`;
         });
 
         async function loadRandomKeyframes() {
             try {
-                const res  = await fetch(`${API_BASE}/api/random?limit=50`);
+                const res  = await fetch(`${API_BASE}/api/random?limit=24`);
                 const data = await res.json();
                 if (data.results) renderGallery(data.results);
             } catch (e) {}
@@ -880,7 +1307,7 @@
             let prompt = queryInput.value.trim();
             if (!prompt) return;
 
-            // ⚡ Huỷ request search trước đó (nếu còn đang chạy) — tránh trường
+            // Huỷ request search trước đó (nếu còn đang chạy) — tránh trường
             // hợp response CŨ về SAU response MỚI (do mạng chậm) rồi ghi đè
             // nhầm lên kết quả mới hơn khi người dùng bấm search liên tục.
             if (currentSearchController) currentSearchController.abort();
@@ -889,12 +1316,12 @@
 
             try {
                 if (autoTranslateCheckbox.checked) {
-                    statusBar.textContent = '⏳ Đang dịch VI → EN...';
+                    statusBar.textContent = 'Đang dịch VI → EN...';
                     prompt = await translateIfNeeded(prompt);
                 }
-                statusBar.textContent = '⏳ Đang tìm kiếm...';
-
                 const vf = getVideoFilter();
+
+                statusBar.textContent = 'Đang tìm kiếm...';
                 let endpoint = 'search';
                 if (primaryMode === 'asr') endpoint = 'search-asr';
                 else if (primaryMode === 'semantic+asr') endpoint = 'search/semantic+asr';
@@ -907,11 +1334,11 @@
                 if (data.results) {
                     renderGallery(data.results);
                     lastQueryVector = null;
-                    statusBar.textContent = `✅ ${data.results.length} kết quả ${vf ? '(filter: ' + vf + ')' : ''}`;
+                    statusBar.textContent = `${data.results.length} kết quả ${vf ? '(filter: ' + vf + ')' : ''}`;
                 }
             } catch (e) {
                 if (e.name === 'AbortError') return; // bị huỷ do có search mới hơn, bỏ qua im lặng
-                alert('❌ Lỗi kết nối tới Server.');
+                alert('Lỗi kết nối tới Server.');
             }
         }
 
@@ -920,19 +1347,19 @@
             const formData = new FormData();
             formData.append('file', selectedLookupFile);
             try {
-                statusBar.textContent = '⏳ Đang tải ảnh lên và tra cứu...';
+                statusBar.textContent = 'Đang tải ảnh lên và tra cứu...';
                 const res  = await fetch(`${API_BASE}/api/lookup/image`, { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.results?.length > 0) {
                     renderGallery(data.results);
                     statusBar.textContent = data.match_type === 'exact'
-                        ? '✅ Khớp CHÍNH XÁC 100%.'
-                        : `⚠️ Không khớp hash — ${data.results.length} kết quả GẦN GIỐNG NHẤT.`;
+                        ? 'Khớp CHÍNH XÁC 100%.'
+                        : `Không khớp hash — ${data.results.length} kết quả GẦN GIỐNG NHẤT.`;
                 } else {
                     alert('Không tra cứu được keyframe phù hợp.');
                 }
             } catch {
-                alert('❌ Lỗi kết nối khi tra cứu ảnh.');
+                alert('Lỗi kết nối khi tra cứu ảnh.');
             }
         }
         searchLookupImgBtn.addEventListener('click', performImageLookup);
@@ -942,24 +1369,23 @@
             let t2 = document.getElementById('trakeInput2').value.trim();
             let t3 = document.getElementById('trakeInput3').value.trim();
             let t4 = document.getElementById('trakeInput4').value.trim();
-            const ctx = document.getElementById('trakeContext').value.trim();
 
             if (!t1 && !t2 && !t3 && !t4) { alert('Vui lòng nhập ít nhất một sự kiện!'); return; }
 
             try {
                 if (autoTranslateCheckbox.checked) {
-                    statusBar.textContent = '⏳ Đang dịch TraKE VI → EN...';
+                    statusBar.textContent = 'Đang dịch TraKE VI → EN...';
                     [t1, t2, t3, t4] = await Promise.all([
                         translateIfNeeded(t1), translateIfNeeded(t2),
                         translateIfNeeded(t3), translateIfNeeded(t4),
                     ]);
                 }
-                statusBar.textContent = '⏳ Đang xử lý chuỗi TraKE...';
+                statusBar.textContent = 'TraKE: tìm từng mốc, chỉ giữ video có đủ E1–E4...';
                 const body = {
                     trek1: t1, trek2: t2, trek3: t3, trek4: t4,
-                    context: ctx,
-                    top_k: 5,
+                    top_k: 20,
                     video_filter: getVideoFilter(),
+                    event_min_score: 0,
                 };
                 const res  = await fetch(`${API_BASE}/api/search/trake`, {
                     method: 'POST',
@@ -969,12 +1395,12 @@
                 const data = await res.json();
                 if (data.results) {
                     renderGallery(data.results);
-                    statusBar.textContent = `🚀 TraKE: ${data.results.length} kết quả`;
+                    statusBar.textContent = `TraKE đủ mốc: ${data.results.length} keyframe (video phải có cả E1–E4)`;
                 } else {
                     alert('Không tìm thấy kết quả TraKE.');
                 }
             } catch {
-                alert('❌ Lỗi kết nối Server TraKE.');
+                alert('Lỗi kết nối Server TraKE.');
             }
         }
         searchTrakeBtn.addEventListener('click', performTrakeSearch);
@@ -989,8 +1415,12 @@
 
             const videoName = metaPathText.split(/[/\\]/)[0];
             let frameIdParam = '';
-            let activeMode   = primaryMode;
-            if (isVqaCombined && primaryMode !== 'trake') activeMode = 'vqa';
+            // Dùng chung loại nộp bài đã chọn thủ công (KIS/QA/TRAKE) ở panel DRES,
+            // thay vì tự suy ra riêng theo tab/isVqaCombined như trước — tránh 2 nơi
+            // "đoán" ra 2 loại khác nhau cho cùng một lần nộp.
+            const submissionType = resolveSubmissionType();
+            const csvModeMap = { TRAKE: 'trake', QA: 'vqa', KIS: 'semantic' };
+            const activeMode = csvModeMap[submissionType] || 'semantic';
 
             if (activeMode === 'trake') {
                 if (trakeSelectedFrames.length === 0) { alert('Vui lòng xác nhận các frame TraKE trước!'); return; }
@@ -1004,17 +1434,181 @@
                 const res  = await fetch(url, { method: 'POST' });
                 const data = await res.json();
                 if (data.status === 'success') {
-                    alert(`✅ Lưu thành công: ${filenameInput}.csv (mode: ${activeMode.toUpperCase()})`);
+                    alert(`Lưu thành công: ${filenameInput}.csv (mode: ${submissionType})`);
                     if (activeMode === 'trake') {
                         trakeSelectedFrames = [];
-                        trakeCount.textContent = '0';
+                        trakeQueueDetails = [];
+                        renderTrakeQueuePanel();
                         document.querySelectorAll('.image-card').forEach(c => c.classList.remove('trake-locked'));
                     }
                 } else {
-                    alert(`❌ Lỗi: ${data.message}`);
+                    alert(`Lỗi: ${data.message}`);
                 }
             } catch {
-                alert('❌ Không thể kết nối Server.');
+                alert('Không thể kết nối Server.');
+            }
+        });
+
+        // ==========================================================
+        // NỘP BÀI QUA DRES API (thay cho việc gõ tay như tool cũ)
+        // ==========================================================
+        const dresBaseUrlInput   = document.getElementById('dresBaseUrl');
+        const dresUsernameInput  = document.getElementById('dresUsername');
+        const dresPasswordInput  = document.getElementById('dresPassword');
+        const dresLoginBtn       = document.getElementById('dresLoginBtn');
+        const dresLoginStatus    = document.getElementById('dresLoginStatus');
+        const dresEvalSelect     = document.getElementById('dresEvalSelect');
+        const dresSubmitStatus   = document.getElementById('dresSubmitStatus');
+        const submitDresBtn      = document.getElementById('submitDresBtn');
+
+        // Nhớ lại base URL/username giữa các lần tải trang cho đỡ phải gõ lại
+        // (KHÔNG lưu password).
+        try {
+            dresBaseUrlInput.value  = localStorage.getItem('dres_base_url') || dresBaseUrlInput.value;
+            dresUsernameInput.value = localStorage.getItem('dres_username') || '';
+        } catch (e) {}
+
+        dresLoginBtn.addEventListener('click', async () => {
+            const baseUrl  = dresBaseUrlInput.value.trim();
+            const username = dresUsernameInput.value.trim();
+            const password = dresPasswordInput.value;
+            if (!baseUrl || !username || !password) {
+                dresLoginStatus.textContent = 'Vui lòng nhập đủ Base URL / Username / Password.';
+                return;
+            }
+            dresLoginStatus.textContent = 'Đang đăng nhập...';
+            try {
+                const res  = await fetch(`${API_BASE}/api/dres/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ base_url: baseUrl, username, password }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.sessionId) {
+                    throw new Error(data.description || 'Đăng nhập thất bại.');
+                }
+                dresSessionId = data.sessionId;
+                try {
+                    localStorage.setItem('dres_base_url', baseUrl);
+                    localStorage.setItem('dres_username', username);
+                } catch (e) {}
+                dresLoginStatus.textContent = 'Đăng nhập thành công. Đang tải evaluation...';
+                await loadDresEvaluations(baseUrl, dresSessionId);
+                const loginBox = document.getElementById('dresLoginDetails');
+                if (loginBox) loginBox.open = false;
+            } catch (err) {
+                dresLoginStatus.textContent = `${err.message}`;
+            }
+        });
+
+        async function loadDresEvaluations(baseUrl, session) {
+            try {
+                const res  = await fetch(`${API_BASE}/api/dres/evaluations?base_url=${encodeURIComponent(baseUrl)}&session=${encodeURIComponent(session)}`);
+                const data = await res.json();
+                const active = (Array.isArray(data) ? data : []).filter(e => e.status === 'ACTIVE');
+                if (active.length === 0) {
+                    dresLoginStatus.textContent = 'Không tìm thấy evaluation đang ACTIVE.';
+                    return;
+                }
+                dresEvalSelect.innerHTML = '';
+                active.forEach(ev => {
+                    const opt = document.createElement('option');
+                    opt.value = ev.id;
+                    opt.textContent = `${ev.name} (${ev.id})`;
+                    dresEvalSelect.appendChild(opt);
+                });
+                dresEvalSelect.style.display = 'block';
+                dresEvaluationId = dresEvalSelect.value;
+                dresLoginStatus.textContent = `Sẵn sàng nộp bài — evaluation: ${dresEvalSelect.selectedOptions[0].textContent}`;
+            } catch (err) {
+                dresLoginStatus.textContent = `Lỗi tải evaluation: ${err.message}`;
+            }
+        }
+        dresEvalSelect.addEventListener('change', () => { dresEvaluationId = dresEvalSelect.value; });
+
+        // Loại nộp bài giờ do NGƯỜI DÙNG CHỌN THỦ CÔNG (radio KIS/QA/TRAKE ở panel
+        // nộp bài), áp dụng như nhau ở MỌI tab tính năng (semantic, asr, trake, tra
+        // cứu ảnh, semantic+asr, semantic+ocr...) — không còn tự suy luận theo tab
+        // hay theo hàng đợi TraKE nữa.
+        // NGOẠI LỆ DUY NHẤT: nếu chọn QA nhưng để trống ô đáp án VQA thì coi như
+        // truy vấn bình thường, tự nộp dạng KIS.
+        function resolveSubmissionType() {
+            if (dresSubmissionType === 'QA' && !vqaInputVal.value.trim()) {
+                return 'KIS';
+            }
+            return dresSubmissionType;
+        }
+
+        function buildAnswerSets(type) {
+            if (type === 'TRAKE') {
+                const videoId = submitVideoNameInput.value.trim() || (trakeQueueDetails[0] && trakeQueueDetails[0].video_name);
+                if (!videoId) throw new Error('Chưa có Video ID cho TraKE.');
+                const raws = ['trakeStart1','trakeStart2','trakeStart3','trakeStart4'].map(id => document.getElementById(id).value);
+                const times = raws.map(parseTimeInputToMs);
+                const filled = times.filter(t => t !== null);
+                if (filled.length < 2) throw new Error('TraKE cần ít nhất 2 mốc start (tối đa 4). Form AIC25: start = end.');
+                if (times.some((t, i) => raws[i].trim() && t === null)) {
+                    throw new Error('Một mốc TraKE không parse được. Dùng 11:14:299, 6\'22, 06:22 hoặc ms.');
+                }
+                const answers = filled.map(t => ({ mediaItemName: videoId, start: t, end: t }));
+                return [{ answers }];
+            }
+
+            const videoId = submitVideoNameInput.value.trim();
+            const startMs = parseTimeInputToMs(submitStartTimeInput.value);
+            const endMs   = parseTimeInputToMs(submitEndTimeInput.value) ?? startMs;
+            if (!videoId) throw new Error('Chưa có Video ID — vui lòng chọn một frame trước.');
+            if (startMs === null) throw new Error('Không đọc được Start Time — nhập theo dạng 6\'22, 06:22 hoặc số giây/ms.');
+
+            if (type === 'QA') {
+                const answer = vqaInputVal.value.trim();
+                const formattedText = `QA-${answer}-${videoId}-${startMs}`;
+                return [{ answers: [{ text: formattedText }] }];
+            }
+            // KIS
+            return [{ answers: [{ mediaItemName: videoId, start: startMs, end: endMs }] }];
+        }
+
+        submitDresBtn.addEventListener('click', async () => {
+            if (!dresSessionId || !dresEvaluationId) {
+                dresSubmitStatus.textContent = 'Vui lòng đăng nhập DRES và chọn evaluation trước (mục ở trên).';
+                return;
+            }
+            const type = resolveSubmissionType();
+            let answerSets;
+            try {
+                answerSets = buildAnswerSets(type);
+            } catch (err) {
+                dresSubmitStatus.textContent = `${err.message}`;
+                return;
+            }
+
+            dresSubmitStatus.textContent = `Đang nộp bài (${type})...`;
+            try {
+                const res  = await fetch(`${API_BASE}/api/dres/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        base_url: dresBaseUrlInput.value.trim(),
+                        session: dresSessionId,
+                        evaluation_id: dresEvaluationId,
+                        answer_sets: answerSets,
+                    }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    dresSubmitStatus.textContent = `Nộp bài thành công (${type}).`;
+                    if (type === 'TRAKE') {
+                        trakeSelectedFrames = [];
+                        trakeQueueDetails = [];
+                        renderTrakeQueuePanel();
+                        document.querySelectorAll('.image-card').forEach(c => c.classList.remove('trake-locked'));
+                    }
+                } else {
+                    dresSubmitStatus.textContent = `Lỗi (${res.status}): ${data.description || JSON.stringify(data)}`;
+                }
+            } catch (err) {
+                dresSubmitStatus.textContent = `Không gửi được: ${err.message}`;
             }
         });
 
@@ -1042,7 +1636,33 @@
             }
         });
 
-        window.addEventListener('DOMContentLoaded', loadRandomKeyframes);
+        document.getElementById('findSimilarBtn').addEventListener('click', async () => {
+            const path = currentSelectedFrameData?.image_path || document.getElementById('metaPath').textContent.trim();
+            if (!path || path === '---') {
+                alert('Chọn một keyframe trong Inspector trước khi Find Similar.');
+                return;
+            }
+            statusBar.textContent = 'Find Similar (CLIP image-to-image)...';
+            try {
+                const vf = getVideoFilter();
+                const res = await fetch(`${API_BASE}/api/search/similar?image_path=${encodeURIComponent(path)}&top_k=50&video_filter=${encodeURIComponent(vf)}`);
+                const data = await res.json();
+                if (data.results?.length) {
+                    renderGallery(data.results);
+                    statusBar.textContent = `Find Similar: ${data.results.length} frame gần giống (${primaryMode})`;
+                } else {
+                    alert(data.error || 'Không tìm thấy ảnh tương tự.');
+                }
+            } catch (e) {
+                alert('Lỗi Find Similar.');
+            }
+        });
+
+        vqaInputVal.addEventListener('input', updateSubmitTypeBadge);
+        window.addEventListener('DOMContentLoaded', () => {
+            updateUIState();
+            loadRandomKeyframes();
+        });
     </script>
 </body>
 </html>
