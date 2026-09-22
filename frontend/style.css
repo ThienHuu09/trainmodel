@@ -154,9 +154,18 @@ body {
    ========================================================================== */
 .gallery {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 20px;
-    padding-bottom: 20px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    padding-bottom: 16px;
+    contain: layout;
+}
+
+@media (max-width: 1200px) {
+    .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 800px) {
+    .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .image-card {
@@ -164,21 +173,20 @@ body {
     border-radius: 8px;
     overflow: hidden;
     cursor: pointer;
-    border: 2px solid transparent; 
+    border: 2px solid transparent;
     position: relative;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    content-visibility: auto;
+    contain: content;
+    contain-intrinsic-size: auto 200px;
+    transition: border-color 0.15s ease;
 }
 
-.image-card:hover, .image-card.selected {
-    transform: translateY(-5px);
+.image-card:hover {
     border-color: #3b82f6;
-    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
 }
 
 .image-card.selected {
     border-color: #10b981;
-    box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4);
 }
 
 .image-wrapper {
@@ -190,14 +198,10 @@ body {
 }
 
 .image-wrapper img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.5s ease;
-}
-
-.image-card:hover .image-wrapper img {
-    transform: scale(1.08);
 }
 
 .score-badge {
@@ -211,7 +215,6 @@ body {
     padding: 4px 8px;
     border-radius: 4px;
     z-index: 10;
-    backdrop-filter: blur(4px);
 }
 
 .timestamp-badge {
