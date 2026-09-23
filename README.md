@@ -13,6 +13,8 @@ dataset: https://www.kaggle.com/datasets/thinhunguyn/aic2026
 
 mapkeyframes: https://www.kaggle.com/datasets/thinhunguyn/map-keyframes26
 
+             https://www.kaggle.com/datasets/thinhunguyn/nguyn-trn-quang-minh
+
 videos: https://www.kaggle.com/datasets/vngiabnhnguyn/video-aic2026-binh?fbclid=IwY2xjawT9UoFwZG9mA2V4dG4DYWVtAjExAHNydGMGYXBwX2lkATAAAR4nJuDCpjR516u2Z41FKN4qgLZ8c5Sq2PMFzQfAXyuXXyPBsnhR3ObSTkEqtg_aem_1WBsfBUJm7N1np38pa8Aeg
 
 ## 📂 Cấu trúc Thư mục Dự án AIC2026
