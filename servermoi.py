@@ -103,6 +103,17 @@ BASE_IMAGE_DIRS = [
     r"C:\AIC2026\dataset_webp",        # batch 1 (cũ)
     r"E:\dataset batch 2",     # batch 2 (mới)
 ]
+# Các đuôi video hỗ trợ hiển thị — thử theo đúng thứ tự này. .mov (QuickTime)
+# thêm vào theo yêu cầu, media_type tương ứng khai báo ở VIDEO_MIME_TYPES.
+VIDEO_EXTENSIONS = [".mp4", ".mov", ".mkv", ".webm", ".avi"]
+VIDEO_MIME_TYPES = {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".mkv": "video/x-matroska",
+    ".webm": "video/webm",
+    ".avi": "video/x-msvideo",
+}
+
 VIDEO_DIRS = [
     r"C:\AIC2026\video",           # batch 1 (cũ)
     r"F:\videos",               # batch 2 (mới)
@@ -132,12 +143,20 @@ def resolve_image_abs_path(image_path: str) -> str:
 
 def resolve_video_abs_path(filename: str) -> str:
   """Trả về đường dẫn video tồn tại đầu tiên khi thử qua từng thư mục trong
-  VIDEO_DIRS (batch1 rồi batch2, ...)."""
-  for base in VIDEO_DIRS:
-    candidate = os.path.join(base, filename)
-    if os.path.exists(candidate):
-      return candidate
-  return os.path.join(VIDEO_DIRS[0], filename)
+  VIDEO_DIRS (batch1 rồi batch2, ...), và thử lần lượt các đuôi file phổ
+  biến (mp4, mov, mkv, webm, avi) nếu tên chưa có đuôi hoặc đuôi không
+  đúng thực tế trên đĩa."""
+  base = filename
+  for ext in VIDEO_EXTENSIONS:
+    if base.lower().endswith(ext):
+      base = base[: -len(ext)]
+      break
+  for base_dir in VIDEO_DIRS:
+    for ext in VIDEO_EXTENSIONS:
+      candidate = os.path.join(base_dir, base + ext)
+      if os.path.exists(candidate):
+        return candidate
+  return os.path.join(VIDEO_DIRS[0], base + VIDEO_EXTENSIONS[0])
 
 app = FastAPI(
     title=(
@@ -237,7 +256,7 @@ def build_all_ram_caches(force_rescan_hash: bool):
   while True:
     points, next_offset = qdrant_client.scroll(
         collection_name=IMAGE_COLLECTION_NAME,
-        limit=2300,
+        limit=4000,
         offset=next_offset,
         with_payload=True,
         with_vectors=True,
@@ -395,7 +414,7 @@ def build_asr_ram_cache():
   while True:
     points, next_offset = qdrant_client.scroll(
         collection_name=ASR_COLLECTION_NAME,
-        limit=2300,
+        limit=5000,
         offset=next_offset,
         with_payload=True,
         with_vectors=True,
@@ -1444,7 +1463,9 @@ def search_sequential_frames(
           },
       )
 
-    low, high = center_num - 5, center_num + 5
+    # ±10 khung quanh frame trung tâm -> tổng 20 khung hình hiển thị timeline
+    # (trước là ±5 = 10 khung).
+    low, high = center_num - 10, center_num + 10
 
     matched = []
     for i in idxs:
@@ -1732,14 +1753,13 @@ def get_local_image(path: str):
 
 @app.get("/api/video")
 def get_local_video(video_name: str):
-  filename = (
-      f"{video_name}.mp4" if not video_name.endswith(".mp4") else video_name
-  )
-  video_path = resolve_video_abs_path(filename)
+  video_path = resolve_video_abs_path(video_name)
 
   if os.path.exists(video_path):
-    return FileResponse(video_path, media_type="video/mp4")
-  return {"error": f"Video not found at {video_path} (đã thử qua: {VIDEO_DIRS})"}
+    ext = os.path.splitext(video_path)[1].lower()
+    mime = VIDEO_MIME_TYPES.get(ext, "video/mp4")
+    return FileResponse(video_path, media_type=mime)
+  return {"error": f"Video not found at {video_path} (đã thử qua: {VIDEO_DIRS} x {VIDEO_EXTENSIONS})"}
 
 
 # ==========================================
