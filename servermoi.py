@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 import csv
 import functools
 import hashlib
@@ -122,6 +123,11 @@ VIDEO_DIRS = [
 # Giữ lại 2 biến đơn (BASE_IMAGE_DIR/VIDEO_DIR) để tương thích ngược, luôn
 # trỏ về thư mục batch1 — chỉ dùng làm fallback cuối khi resolve_*() không
 # tìm thấy file ở đâu cả (để log lỗi có đường dẫn dễ hiểu).
+# Số luồng song song khi hash ảnh lúc khởi động (I/O-bound nên để cao hơn số
+# core CPU vẫn lợi). Máy ổ SSD/NVMe có thể tăng lên 64; ổ HDD nên giữ thấp
+# hơn (~8-16) để tránh thrashing đầu đọc.
+HASH_SCAN_WORKERS = 32
+
 BASE_IMAGE_DIR = BASE_IMAGE_DIRS[0]
 VIDEO_DIR = VIDEO_DIRS[0]
 
@@ -252,6 +258,7 @@ def build_all_ram_caches(force_rescan_hash: bool):
   newly_hashed, skipped_hash, missing_hash = 0, 0, 0
   next_offset = None
   loaded_count = 0
+  to_hash = []  # (image_path, video_name, frame_id, pts_time) cần hash — xử lý song song sau vòng lặp
 
   while True:
     points, next_offset = qdrant_client.scroll(
@@ -287,22 +294,9 @@ def build_all_ram_caches(force_rescan_hash: bool):
         if not force_rescan_hash and image_path in processed_paths:
           skipped_hash += 1
         else:
-          abs_path = resolve_image_abs_path(image_path)
-          if os.path.exists(abs_path):
-            try:
-              file_hash = compute_sha256(abs_path)
-              hash_index[file_hash] = {
-                  "video_name": v_name,
-                  "frame_id": frame_id,
-                  "image_path": image_path,
-                  "pts_time": pts_time,
-              }
-              processed_paths.add(image_path)
-              newly_hashed += 1
-            except Exception:
-              pass
-          else:
-            missing_hash += 1
+          # Không hash ngay tại đây (I/O tuần tự rất chậm) — gom lại rồi
+          # chạy song song đa luồng bên dưới, sau khi tải hết điểm.
+          to_hash.append((image_path, v_name, frame_id, pts_time))
 
     loaded_count += len(points)
     if loaded_count % 20000 < 3000:
@@ -310,6 +304,55 @@ def build_all_ram_caches(force_rescan_hash: bool):
 
     if next_offset is None:
       break
+
+  # --- Hash song song đa luồng (I/O-bound -> ThreadPoolExecutor rất hiệu quả) ---
+  if to_hash:
+    print(
+        f"⏳ Đang hash song song {len(to_hash)} ảnh mới bằng"
+        f" {HASH_SCAN_WORKERS} luồng..."
+    )
+    _hash_t0 = time.time()
+
+    def _hash_one(item):
+      image_path, v_name, frame_id, pts_time = item
+      abs_path = resolve_image_abs_path(image_path)
+      if not os.path.exists(abs_path):
+        return (image_path, None)
+      try:
+        file_hash = compute_sha256(abs_path)
+        return (
+            image_path,
+            {
+                "hash": file_hash,
+                "video_name": v_name,
+                "frame_id": frame_id,
+                "image_path": image_path,
+                "pts_time": pts_time,
+            },
+        )
+      except Exception:
+        return (image_path, None)
+
+    done_count = 0
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=HASH_SCAN_WORKERS
+    ) as executor:
+      for image_path, result in executor.map(_hash_one, to_hash):
+        done_count += 1
+        if result is None:
+          missing_hash += 1
+        else:
+          file_hash = result.pop("hash")
+          hash_index[file_hash] = result
+          processed_paths.add(image_path)
+          newly_hashed += 1
+        if done_count % 5000 == 0:
+          print(f"   ... đã hash {done_count}/{len(to_hash)} ảnh")
+
+    print(
+        f"✅ Hash song song xong {len(to_hash)} ảnh trong"
+        f" {time.time() - _hash_t0:.1f} giây."
+    )
 
   if len(all_vectors) == 0:
     print(
@@ -1999,5 +2042,51 @@ def dres_submit(payload: DresSubmitRequest):
         content={"description": f"Không kết nối được tới DRES: {e}"},
         status_code=502,
     )
+@app.get("/api/dres/state")
+def dres_evaluation_state(
+    base_url: str = Query(..., description="Base URL của server DRES"),
+    session: str = Query(..., description="sessionId lấy được từ /api/dres/login"),
+):
+  """Proxy GET {base_url}/evaluation/state/list?session=... — trả về mảng
+  ApiEvaluationState (mỗi evaluation đang chạy kèm timeElapsed/timeLeft
+  tính bằng giây). Dùng để hiển thị đồng hồ đếm ngược giống BTC."""
+  try:
+    url = f"{base_url.rstrip('/')}/evaluation/state/list"
+    resp = requests.get(url, params={"session": session}, timeout=15)
+    try:
+      data = resp.json()
+    except Exception:
+      data = {"description": resp.text}
+    return JSONResponse(content=data, status_code=resp.status_code)
+  except Exception as e:
+    return JSONResponse(
+        content={"description": f"Không kết nối được tới DRES: {e}"},
+        status_code=502,
+    )
+
+
+@app.get("/api/dres/current-task")
+def dres_current_task(
+    base_url: str = Query(..., description="Base URL của server DRES"),
+    session: str = Query(..., description="sessionId lấy được từ /api/dres/login"),
+    evaluation_id: str = Query(..., description="Evaluation ID đang theo dõi"),
+):
+  """Proxy GET {base_url}/client/evaluation/currentTask/{evaluationId}?session=...
+  — trả về thông tin task hiện tại (tên, loại truy vấn, thời lượng tối đa)."""
+  try:
+    url = f"{base_url.rstrip('/')}/client/evaluation/currentTask/{evaluation_id}"
+    resp = requests.get(url, params={"session": session}, timeout=15)
+    try:
+      data = resp.json()
+    except Exception:
+      data = {"description": resp.text}
+    return JSONResponse(content=data, status_code=resp.status_code)
+  except Exception as e:
+    return JSONResponse(
+        content={"description": f"Không kết nối được tới DRES: {e}"},
+        status_code=502,
+    )
+
+
 if __name__ == "__main__":
   uvicorn.run(app, host="127.0.0.1", port=8000)
