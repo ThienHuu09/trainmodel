@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N0N-L1NERS </title>
+    <title>N0N-L1NERS — CLIP + TraKE + DRES</title>
     <link rel="stylesheet" href="style.css">
     <style>
         /* ============ TraKE box ============ */
@@ -386,6 +386,18 @@
                 <select id="dresEvalSelect" style="display:none; min-width:180px;"></select>
                 <span id="dresLoginStatus" style="font-size:11px; color:#94a3b8;">Login 1 lần cho mọi tab</span>
             </div>
+            <div id="dresTaskMonitor" style="display:none; margin-top:10px; padding:10px 14px; background:#0f172a; border:1px solid #334155; border-radius:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span id="dresTaskTypeBadge" style="font-size:0.7rem; font-weight:bold; background:#334155; color:#93c5fd; padding:2px 8px; border-radius:10px;">--</span>
+                        <strong id="dresTaskName" style="color:#e2e8f0;">Chưa có task nào đang chạy</strong>
+                    </div>
+                    <div id="dresTaskCountdown" style="font-size:1.1rem; font-weight:bold; color:#e2e8f0;">--:--</div>
+                </div>
+                <div style="background:#1e293b; height:6px; border-radius:3px; overflow:hidden; margin-top:8px;">
+                    <div id="dresTaskProgressBar" style="height:100%; width:0%; background:#22c55e; transition:width 1s linear, background 0.3s;"></div>
+                </div>
+            </div>
         </details>
         <div class="top-search-container">
             <div class="search-bar-box" id="singleSearchBox">
@@ -513,6 +525,56 @@
                     <button id="submitDresBtn" style="margin-top:10px; width:100%; background:#16a34a; color:#fff; border:none; border-radius:4px; padding:10px; font-weight:bold; cursor:pointer;">🚀 NỘP BÀI</button>
                     <div id="dresSubmitStatus" style="font-size:0.75rem; margin-top:6px;"></div>
 
+                    <div id="dresHistoryPanel" style="margin-top:16px; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:14px 16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                            <div>
+                                <div style="font-weight:bold; color:#e2e8f0;">🕐 Lịch Sử Nộp Bài Trên Trình Duyệt (Local History)</div>
+                                <div style="font-size:0.72rem; color:#64748b;">Dữ liệu lưu độc quyền trên máy của bạn (localStorage). Không lưu trên server.</div>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button id="dresHistExportJsonBtn" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:6px 10px;font-size:0.75rem;cursor:pointer;">📄 JSON</button>
+                                <button id="dresHistExportCsvBtn" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:6px 10px;font-size:0.75rem;cursor:pointer;">📊 CSV</button>
+                                <button id="dresHistClearBtn" style="background:#7f1d1d;color:#fca5a5;border:1px solid #991b1b;border-radius:4px;padding:6px 10px;font-size:0.75rem;cursor:pointer;">🗑️ Xóa lịch sử</button>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-top:12px;">
+                            <div style="background:#1e293b;border-radius:6px;padding:10px;">
+                                <div style="font-size:0.7rem;color:#94a3b8;">Tổng số bài nộp</div>
+                                <div id="dresHistTotal" style="font-size:1.3rem;font-weight:bold;color:#e2e8f0;">0</div>
+                            </div>
+                            <div style="background:#1e293b;border-radius:6px;padding:10px;">
+                                <div style="font-size:0.7rem;color:#4ade80;">Số lần Đúng (Correct)</div>
+                                <div id="dresHistCorrect" style="font-size:1.3rem;font-weight:bold;color:#4ade80;">0</div>
+                            </div>
+                            <div style="background:#1e293b;border-radius:6px;padding:10px;">
+                                <div style="font-size:0.7rem;color:#f87171;">Số lần Sai (Wrong)</div>
+                                <div id="dresHistWrong" style="font-size:1.3rem;font-weight:bold;color:#f87171;">0</div>
+                            </div>
+                            <div style="background:#1e293b;border-radius:6px;padding:10px;">
+                                <div style="font-size:0.7rem;color:#60a5fa;">Tỷ lệ chính xác</div>
+                                <div id="dresHistAccuracy" style="font-size:1.3rem;font-weight:bold;color:#60a5fa;">0%</div>
+                            </div>
+                        </div>
+                        <div style="overflow-x:auto; margin-top:12px;">
+                            <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                                <thead>
+                                    <tr style="color:#94a3b8; text-align:left; border-bottom:1px solid #334155;">
+                                        <th style="padding:6px 8px;">#</th>
+                                        <th style="padding:6px 8px;">THỜI GIAN</th>
+                                        <th style="padding:6px 8px;">FORMAT</th>
+                                        <th style="padding:6px 8px;">TÓM TẮT ĐÁP ÁN</th>
+                                        <th style="padding:6px 8px;">KẾT QUẢ</th>
+                                        <th style="padding:6px 8px;">ĐỘ TRỄ</th>
+                                        <th style="padding:6px 8px;">THAO TÁC</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dresHistTableBody">
+                                    <tr><td colspan="7" style="text-align:center; color:#64748b; padding:12px;">Chưa có lượt nộp nào.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <details style="margin-top:12px;">
                         <summary style="color:#64748b; font-size:0.72rem;">🗃️ Dự phòng: lưu CSV cục bộ (cách cũ)</summary>
                         <input type="text" id="csvFilenameInput" placeholder="Nhập tên file (vd: query-p1-11-kis)..." />
@@ -608,6 +670,68 @@
         // --- Trạng thái phiên đăng nhập DRES (Ban tổ chức) ---
         let dresSessionId    = 'OlZNXlLXsY1j8n8zfngBIF8FzV-OXduT'; // prefill sẵn, bấm Đăng nhập lại nếu hết hạn
         let dresEvaluationId = null;
+        let dresTaskPollTimer = null;
+        let dresTaskInfoTimer = null;
+        let dresCurrentTaskMaxDurationSec = null;
+
+        // Field name thật của DRES v2 cho currentTask/state chưa được test trực
+        // tiếp trên server thi đấu — có log console để dễ đối chiếu & chỉnh nếu
+        // BTC dùng field khác.
+        async function fetchDresCurrentTask() {
+            if (!dresSessionId || !dresEvaluationId) return;
+            try {
+                const url = `${API_BASE}/api/dres/current-task?base_url=${encodeURIComponent(dresBaseUrlInput.value.trim())}&session=${encodeURIComponent(dresSessionId)}&evaluation_id=${encodeURIComponent(dresEvaluationId)}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                console.log('[DRES currentTask] raw response:', data);
+                const name = data.name || data.taskName || (data.template && data.template.name) || (data.taskGroup && data.taskGroup.name) || '(không rõ tên task)';
+                const type = (data.taskType && data.taskType.name) || data.type || data.taskGroup || '';
+                const durationSec = data.duration || (data.template && data.template.duration) || (data.taskType && data.taskType.duration) || null;
+                document.getElementById('dresTaskName').textContent = name;
+                document.getElementById('dresTaskTypeBadge').textContent = type || '?';
+                dresCurrentTaskMaxDurationSec = durationSec;
+                document.getElementById('dresTaskMonitor').style.display = 'block';
+            } catch (e) {
+                console.warn('[DRES currentTask] lỗi:', e);
+            }
+        }
+
+        async function pollDresState() {
+            if (!dresSessionId || !dresEvaluationId) return;
+            try {
+                const url = `${API_BASE}/api/dres/state?base_url=${encodeURIComponent(dresBaseUrlInput.value.trim())}&session=${encodeURIComponent(dresSessionId)}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                const list = Array.isArray(data) ? data : (data.states || data.results || []);
+                const mine = list.find(s => s.evaluationId === dresEvaluationId || s.id === dresEvaluationId) || list[0];
+                const countdownEl = document.getElementById('dresTaskCountdown');
+                const barEl = document.getElementById('dresTaskProgressBar');
+                if (!mine) { countdownEl.textContent = '--:--'; return; }
+                const timeLeft = mine.timeLeft ?? mine.time_left;
+                if (typeof timeLeft !== 'number') { countdownEl.textContent = '--:--'; return; }
+                const mm = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                const ss = Math.floor(timeLeft % 60).toString().padStart(2, '0');
+                countdownEl.textContent = `${mm}:${ss}`;
+                document.getElementById('dresTaskMonitor').style.display = 'block';
+                if (dresCurrentTaskMaxDurationSec) {
+                    const pct = Math.max(0, Math.min(100, (timeLeft / dresCurrentTaskMaxDurationSec) * 100));
+                    barEl.style.width = pct + '%';
+                    barEl.style.background = pct < 20 ? '#ef4444' : (pct < 50 ? '#eab308' : '#22c55e');
+                }
+            } catch (e) {
+                console.warn('[DRES state] lỗi:', e);
+            }
+        }
+
+        function startDresTaskPolling() {
+            if (dresTaskPollTimer) clearInterval(dresTaskPollTimer);
+            if (dresTaskInfoTimer) clearInterval(dresTaskInfoTimer);
+            fetchDresCurrentTask();
+            pollDresState();
+            dresTaskPollTimer = setInterval(pollDresState, 2000);
+            dresTaskInfoTimer = setInterval(fetchDresCurrentTask, 10000);
+        }
+
 
         async function translateIfNeeded(text) {
             if (!text || !autoTranslateCheckbox.checked) return text;
@@ -987,12 +1111,16 @@
         }
 
         // Khi người dùng chọn 1 frame (từ lưới kết quả, timeline, hay lookup ảnh),
-        // chỉ tự động điền Video ID. Start VÀ End giờ NHẬP TAY HOÀN TOÀN — không
-        // còn tự lấy pts_time đổ vào Start nữa; người dùng tự xem "Time:" ở
-        // Keyframe Inspector rồi gõ tay cả 2 ô Start/End (hoặc 4 mốc TraKE).
+        // tự động điền Video ID VÀ Start (ra thẳng mili giây luôn, khỏi phải gõ
+        // tay copy từ "Time:" xuống nữa). Riêng TRAKE có cơ chế xác nhận frame
+        // riêng (renderTrakeQueuePanel tự điền 4 ô trakeStart1-4) nên bỏ qua ở
+        // đây, không đụng vào.
         function updateSubmitPanelFromFrame(frameData) {
             if (!frameData) return;
             submitVideoNameInput.value = frameData.video_name || '';
+            if (dresSubmissionType !== 'TRAKE' && frameData.pts_time != null) {
+                submitStartTimeInput.value = String(Math.round(Number(frameData.pts_time) * 1000));
+            }
             updateSubmitTypeBadge();
         }
 
@@ -1520,11 +1648,12 @@
                 dresEvalSelect.style.display = 'block';
                 dresEvaluationId = dresEvalSelect.value;
                 dresLoginStatus.textContent = `✅ Sẵn sàng nộp bài — evaluation: ${dresEvalSelect.selectedOptions[0].textContent}`;
+                if (dresEvaluationId) startDresTaskPolling();
             } catch (err) {
                 dresLoginStatus.textContent = `❌ Lỗi tải evaluation: ${err.message}`;
             }
         }
-        dresEvalSelect.addEventListener('change', () => { dresEvaluationId = dresEvalSelect.value; });
+        dresEvalSelect.addEventListener('change', () => { dresEvaluationId = dresEvalSelect.value; startDresTaskPolling(); });
 
         // Loại nộp bài giờ do NGƯỜI DÙNG CHỌN THỦ CÔNG (radio KIS/QA/TRAKE ở panel
         // nộp bài), áp dụng như nhau ở MỌI tab tính năng (semantic, asr, trake, tra
@@ -1561,23 +1690,175 @@
                 // mediaItemName/start/end như bản cũ AIC25).
                 const sortedTimes = [...filled].sort((a, b) => a - b);
                 const formattedText = `TR-${videoId}-${sortedTimes.join(',')}`;
+                console.log('[DRES submit] TRAKE — frame IDs gốc:', filled, '-> chuỗi gửi đi:', formattedText);
                 return [{ answers: [{ text: formattedText }] }];
             }
 
             const videoId = stripVideoExt(submitVideoNameInput.value);
-            const startMs = parseTimeInputToMs(submitStartTimeInput.value);
+            const rawStartInput = submitStartTimeInput.value;
+            const startMs = parseTimeInputToMs(rawStartInput);
+            console.log(`[DRES submit] Start Time nhập vào: "${rawStartInput}" -> đổi ra ms: ${startMs}`);
             if (!videoId) throw new Error('Chưa có Video ID — vui lòng chọn một frame trước.');
             if (startMs === null) throw new Error('Không đọc được Start Time — nhập theo dạng 6\'22, 06:22 hoặc số giây/ms.');
 
             if (type === 'QA') {
                 const answer = vqaInputVal.value.trim();
                 const formattedText = `QA-${answer}-${videoId}-${startMs}`;
+                console.log('[DRES submit] QA — chuỗi gửi đi:', formattedText);
                 return [{ answers: [{ text: formattedText }] }];
             }
             // KIS: chuẩn VBS/DRES là 1 frame duy nhất -> luôn gán end = start,
             // bỏ qua ô End Time dù người dùng có nhập gì khác.
+            console.log('[DRES submit] KIS — mediaItemName:', videoId, 'start=end=', startMs, 'ms');
             return [{ answers: [{ mediaItemName: videoId, start: startMs, end: startMs }] }];
         }
+
+        // Tách answer từ answerSets vừa build để: (1) tóm tắt hiển thị trong
+        // bảng lịch sử, (2) lưu lại đủ dữ liệu cho nút "Nạp lại".
+        function parseReloadInfo(type, answerSets) {
+            try {
+                const ans = answerSets[0].answers[0];
+                if (type === 'TRAKE') {
+                    const m = ans.text.match(/^TR-(.+)-([\d,]+)$/);
+                    if (!m) return { summary: ans.text, reload: null };
+                    const videoId = m[1];
+                    const frames = m[2].split(',').map(Number);
+                    return {
+                        summary: `🔗 ${videoId} — [${frames.join(', ')}]`,
+                        reload: { videoId, frames },
+                    };
+                }
+                if (type === 'QA') {
+                    const m = ans.text.match(/^QA-(.+)-([^-]+)-(\d+)$/);
+                    if (!m) return { summary: ans.text, reload: null };
+                    const [, answer, videoId, ms] = m;
+                    return {
+                        summary: `❓ ${answer} — ${videoId} (${ms} ms)`,
+                        reload: { videoId, startMs: Number(ms), answer },
+                    };
+                }
+                // KIS
+                return {
+                    summary: `📼 ${ans.mediaItemName} (${ans.start} ms)`,
+                    reload: { videoId: ans.mediaItemName, startMs: ans.start },
+                };
+            } catch (e) {
+                return { summary: '(không đọc được)', reload: null };
+            }
+        }
+
+        // ==========================================
+        // LỊCH SỬ NỘP BÀI (Local History — localStorage, không gửi lên server)
+        // ==========================================
+        const DRES_HISTORY_KEY = 'dres_submit_history_v1';
+        function loadDresHistory() {
+            try { return JSON.parse(localStorage.getItem(DRES_HISTORY_KEY) || '[]'); }
+            catch (e) { return []; }
+        }
+        function saveDresHistoryToStorage() {
+            try { localStorage.setItem(DRES_HISTORY_KEY, JSON.stringify(dresHistory)); }
+            catch (e) { console.warn('Không lưu được lịch sử:', e); }
+        }
+        let dresHistory = loadDresHistory();
+
+        function renderDresHistory() {
+            const total = dresHistory.length;
+            const correct = dresHistory.filter(h => h.result === 'CORRECT').length;
+            const wrong = dresHistory.filter(h => h.result === 'WRONG').length;
+            const acc = total ? Math.round((correct / total) * 100) : 0;
+            document.getElementById('dresHistTotal').textContent = total;
+            document.getElementById('dresHistCorrect').textContent = correct;
+            document.getElementById('dresHistWrong').textContent = wrong;
+            document.getElementById('dresHistAccuracy').textContent = acc + '%';
+
+            const tbody = document.getElementById('dresHistTableBody');
+            if (!total) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#64748b; padding:12px;">Chưa có lượt nộp nào.</td></tr>';
+                return;
+            }
+            const resultStyle = {
+                CORRECT:       { color: '#4ade80', label: '✓ CORRECT' },
+                WRONG:         { color: '#f87171', label: '✗ WRONG' },
+                INDETERMINATE: { color: '#facc15', label: '● INDETERMINATE' },
+                UNKNOWN:       { color: '#94a3b8', label: '✓ Đã gửi' },
+                ERROR:         { color: '#f87171', label: '⚠ LỖI' },
+            };
+            tbody.innerHTML = '';
+            dresHistory.forEach((h, idx) => {
+                const st = resultStyle[h.result] || { color: '#94a3b8', label: h.result };
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #1e293b';
+                tr.innerHTML = `
+                    <td style="padding:6px 8px; color:#64748b;">#${total - idx}</td>
+                    <td style="padding:6px 8px; color:#94a3b8; white-space:nowrap;">${h.time}</td>
+                    <td style="padding:6px 8px;"><span style="background:#334155;color:#93c5fd;padding:1px 6px;border-radius:8px;font-size:0.68rem;">${h.format}</span></td>
+                    <td style="padding:6px 8px; color:#e2e8f0;">${h.summary}</td>
+                    <td style="padding:6px 8px; color:${st.color}; font-weight:bold; white-space:nowrap;">${st.label}</td>
+                    <td style="padding:6px 8px; color:#64748b; white-space:nowrap;">${h.latencyMs != null ? h.latencyMs + 'ms' : '-'}</td>
+                    <td style="padding:6px 8px;"><button data-idx="${idx}" class="dres-hist-reload-btn" style="background:#1e293b;border:1px solid #334155;color:#93c5fd;border-radius:4px;padding:3px 8px;font-size:0.68rem;cursor:pointer;">↺ Nạp lại</button></td>`;
+                tbody.appendChild(tr);
+            });
+            tbody.querySelectorAll('.dres-hist-reload-btn').forEach(btn => {
+                btn.addEventListener('click', () => reloadDresHistoryEntry(parseInt(btn.dataset.idx, 10)));
+            });
+        }
+
+        function addDresHistoryEntry(entry) {
+            dresHistory.unshift(entry);
+            saveDresHistoryToStorage();
+            renderDresHistory();
+        }
+
+        function reloadDresHistoryEntry(idx) {
+            const h = dresHistory[idx];
+            if (!h || !h.reload) { alert('Lượt nộp này không có đủ dữ liệu để nạp lại.'); return; }
+            const r = h.reload;
+            const radio = document.getElementById(
+                h.format === 'TRAKE' ? 'submitTypeTRAKE' : (h.format === 'QA' ? 'submitTypeQA' : 'submitTypeKIS')
+            );
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change'));
+            if (h.format === 'TRAKE') {
+                submitVideoNameInput.value = r.videoId || '';
+                const slots = ['trakeStart1', 'trakeStart2', 'trakeStart3', 'trakeStart4'];
+                slots.forEach((id, i) => { document.getElementById(id).value = (r.frames && r.frames[i] != null) ? r.frames[i] : ''; });
+            } else {
+                submitVideoNameInput.value = r.videoId || '';
+                submitStartTimeInput.value = (r.startMs != null) ? String(r.startMs) : '';
+                if (h.format === 'QA') vqaInputVal.value = r.answer || '';
+            }
+            dresSubmitStatus.textContent = `↺ Đã nạp lại lượt nộp #${dresHistory.length - idx} — kiểm tra rồi bấm NỘP BÀI.`;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        document.getElementById('dresHistExportJsonBtn').addEventListener('click', () => {
+            const blob = new Blob([JSON.stringify(dresHistory, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `dres_submit_history_${Date.now()}.json`;
+            a.click();
+        });
+        document.getElementById('dresHistExportCsvBtn').addEventListener('click', () => {
+            const header = ['#', 'thoi_gian', 'format', 'tom_tat', 'ket_qua', 'do_tre_ms'];
+            const rows = dresHistory.map((h, idx) => [
+                dresHistory.length - idx, h.time, h.format,
+                '"' + (h.summary || '').replace(/"/g, '""') + '"',
+                h.result, h.latencyMs ?? '',
+            ]);
+            const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `dres_submit_history_${Date.now()}.csv`;
+            a.click();
+        });
+        document.getElementById('dresHistClearBtn').addEventListener('click', () => {
+            if (!confirm('Xóa toàn bộ lịch sử nộp bài lưu trên trình duyệt này?')) return;
+            dresHistory = [];
+            saveDresHistoryToStorage();
+            renderDresHistory();
+        });
+        renderDresHistory();
 
         submitDresBtn.addEventListener('click', async () => {
             if (!dresSessionId || !dresEvaluationId) {
@@ -1592,8 +1873,12 @@
                 dresSubmitStatus.textContent = `⚠️ ${err.message}`;
                 return;
             }
+            console.log('[DRES submit] Payload answerSets cuối cùng sẽ gửi:', JSON.stringify({ answerSets }, null, 2));
+            const { summary, reload } = parseReloadInfo(type, answerSets);
+            const nowLabel = new Date().toLocaleTimeString('vi-VN', { hour12: false });
 
             dresSubmitStatus.textContent = `⏳ Đang nộp bài (${type})...`;
+            const _t0 = performance.now();
             try {
                 const res  = await fetch(`${API_BASE}/api/dres/submit`, {
                     method: 'POST',
@@ -1605,32 +1890,47 @@
                         answer_sets: answerSets,
                     }),
                 });
+                const latencyMs = Math.round(performance.now() - _t0);
                 const data = await res.json();
 
                 // DRES trả verdict thật (CORRECT/WRONG/INDETERMINATE/UNDECIDABLE)
                 // trong body — không chỉ dựa vào HTTP status. Field tên có thể là
                 // "submission", "status" hoặc "verdict" tùy version, nên dò cả 3.
                 const verdictRaw = (data.submission || data.status || data.verdict || '').toString().toUpperCase();
+                let resultCode = 'UNKNOWN';
 
                 if (res.status === 401) {
                     dresSubmitStatus.textContent = '⚠️ Session ID hết hạn (401) — vui lòng đăng nhập lại DRES.';
+                    resultCode = 'ERROR';
                 } else if (res.status === 404) {
                     dresSubmitStatus.textContent = '⚠️ Sai Evaluation ID (404) — kiểm tra lại mục ⚙️ ở trên.';
+                    resultCode = 'ERROR';
                 } else if (res.status === 412) {
                     dresSubmitStatus.textContent = '⚠️ Bị từ chối (412) — nộp trùng kết quả trước đó hoặc task đã hết giờ.';
+                    resultCode = 'ERROR';
                 } else if (res.ok && verdictRaw.includes('WRONG')) {
                     dresSubmitStatus.textContent = `❌ SAI (WRONG) — bị trừ 10 điểm phạt cho lần nộp này.`;
+                    resultCode = 'WRONG';
                 } else if (res.ok && (verdictRaw.includes('INDETERMINATE') || verdictRaw.includes('UNDECIDABLE'))) {
                     dresSubmitStatus.textContent = `🟡 Đang thẩm định (INDETERMINATE) — BGK sẽ kiểm tra thủ công.`;
+                    resultCode = 'INDETERMINATE';
                 } else if (res.ok && verdictRaw.includes('CORRECT')) {
                     dresSubmitStatus.textContent = `✅ CHÍNH XÁC (CORRECT) — điểm đã ghi nhận.`;
+                    resultCode = 'CORRECT';
                 } else if (res.ok) {
                     // Không thấy field verdict trong response -> chỉ chắc chắn là
                     // "nộp thành công", KHÔNG có nghĩa là đúng.
                     dresSubmitStatus.textContent = `✅ Đã gửi lên DRES (${type}) — HTTP ${res.status}. (Server không trả verdict, kiểm tra kết quả trên bảng điểm.)`;
+                    resultCode = 'UNKNOWN';
                 } else {
                     dresSubmitStatus.textContent = `❌ Lỗi (${res.status}): ${data.description || JSON.stringify(data)}`;
+                    resultCode = 'ERROR';
                 }
+
+                addDresHistoryEntry({
+                    time: nowLabel, format: type, summary, result: resultCode,
+                    latencyMs, reload, httpStatus: res.status,
+                });
 
                 if (res.ok && type === 'TRAKE') {
                     trakeSelectedFrames = [];
@@ -1640,6 +1940,10 @@
                 }
             } catch (err) {
                 dresSubmitStatus.textContent = `❌ Không gửi được: ${err.message}`;
+                addDresHistoryEntry({
+                    time: nowLabel, format: type, summary, result: 'ERROR',
+                    latencyMs: null, reload, httpStatus: null,
+                });
             }
         });
 
